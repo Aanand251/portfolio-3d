@@ -74,6 +74,7 @@ const BG           = "#000510";
 const RAIN_COUNT   = 3000;
 const DUST_COUNT   = 800;
 
+/* ============= HAND TRACKING HOOK (tasks-vision) ============= */
 function useHandTracking(handRef, enabled) {
   const landmarkerRef = useRef(null);
   const vidRef        = useRef(null);
@@ -82,7 +83,6 @@ function useHandTracking(handRef, enabled) {
 
   useEffect(() => {
     if (!enabled) {
-      // tear-down
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       if (landmarkerRef.current) { try { landmarkerRef.current.close(); } catch(e){} landmarkerRef.current = null; }
       if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
@@ -95,23 +95,23 @@ function useHandTracking(handRef, enabled) {
 
     (async () => {
       try {
-        const vision = await import('@mediapipe/tasks-vision');
+        const vision = await import("@mediapipe/tasks-vision");
         const { FilesetResolver, HandLandmarker } = vision;
 
         if (cancelled) return;
 
         const wasmFileset = await FilesetResolver.forVisionTasks(
-          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm"
         );
 
         if (cancelled) return;
 
         const landmarker = await HandLandmarker.createFromOptions(wasmFileset, {
           baseOptions: {
-            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task',
-            delegate: 'GPU',
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+            delegate: "GPU",
           },
-          runningMode: 'VIDEO',
+          runningMode: "VIDEO",
           numHands: 1,
           minHandDetectionConfidence: 0.6,
           minTrackingConfidence: 0.5,
@@ -120,20 +120,19 @@ function useHandTracking(handRef, enabled) {
 
         if (cancelled) return;
 
-        // create video element + webcam preview
-        const video = document.createElement('video');
-        video.setAttribute('playsinline', 'true');
+        const video = document.createElement("video");
+        video.setAttribute("playsinline", "true");
         video.autoplay = true;
         video.muted = true;
         video.style.cssText =
-          'position:fixed;bottom:80px;left:16px;width:160px;height:120px;' +
-          'border-radius:12px;border:2px solid #00aaff44;z-index:999;' +
-          'object-fit:cover;opacity:0.85;pointer-events:none;';
+          "position:fixed;bottom:80px;left:16px;width:160px;height:120px;" +
+          "border-radius:12px;border:2px solid #00aaff44;z-index:999;" +
+          "object-fit:cover;opacity:0.85;pointer-events:none;";
         document.body.appendChild(video);
         vidRef.current = video;
 
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: 320, height: 240, facingMode: 'user' },
+          video: { width: 320, height: 240, facingMode: "user" },
         });
         streamRef.current = stream;
         video.srcObject = stream;
@@ -142,14 +141,13 @@ function useHandTracking(handRef, enabled) {
 
         if (cancelled) return;
 
-        // detection loop
         var lastTime = -1;
         function detect() {
           if (cancelled) return;
           rafRef.current = requestAnimationFrame(detect);
           if (!video || video.readyState < 2) return;
           var now = performance.now();
-          if (now - lastTime < 50) return; // ~20fps detection cap
+          if (now - lastTime < 50) return;
           lastTime = now;
           try {
             var result = landmarker.detectForVideo(video, now);
@@ -157,7 +155,7 @@ function useHandTracking(handRef, enabled) {
               if (handRef.current) handRef.current.active = false;
               return;
             }
-            var lm    = result.landmarks[0];
+            var lm     = result.landmarks[0];
             var wrist  = lm[0];
             var thumb   = lm[4];
             var indexTip = lm[8];
@@ -166,13 +164,13 @@ function useHandTracking(handRef, enabled) {
             );
             handRef.current = { active: true, x: wrist.x, y: wrist.y, pinch: pinch };
           } catch (err) {
-            // skip frame
+            // skip frame on error
           }
         }
         detect();
 
       } catch (err) {
-        console.warn('Hand tracking init failed:', err);
+        console.warn("Hand tracking init failed:", err);
         if (handRef.current) handRef.current.active = false;
       }
     })();
@@ -187,6 +185,7 @@ function useHandTracking(handRef, enabled) {
     };
   }, [enabled, handRef]);
 }
+
 /* ============= DNA HELIX ============= */
 function DNAHelix({ onNodeClick, rotRef, handRef }) {
   const grp = useRef();
