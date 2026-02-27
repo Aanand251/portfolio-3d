@@ -677,12 +677,17 @@ const linkBtn = {
    ═══════════════════════════════════════ */
 function useHandTracking(handRef, enabled) {
   const videoRef = useRef(null);
-  const cameraRef = useRef(null);
+  const streamRef = useRef(null);
+  const handsRef = useRef(null);
+  const rafRef = useRef(null);
 
   useEffect(() => {
     if (!enabled) {
-      if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
-      if (videoRef.current) { videoRef.current.srcObject = null; }
+      /* cleanup */
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+      if (videoRef.current) { videoRef.current.srcObject = null; videoRef.current.remove(); videoRef.current = null; }
+      if (handsRef.current) { handsRef.current.close(); handsRef.current = null; }
       handRef.current = { active: false, x: 0.5, pinch: 1 };
       return;
     }
@@ -691,24 +696,39 @@ function useHandTracking(handRef, enabled) {
 
     async function init() {
       try {
-        const { Hands } = await import("@mediapipe/hands");
-        const { Camera } = await import("@mediapipe/camera_utils");
+        /* 1. Import MediaPipe */
+        const handsModule = await import("@mediapipe/hands");
+        const Hands = handsModule.Hands;
 
+        /* 2. Create hidden video element */
         const video = document.createElement("video");
         video.setAttribute("playsinline", "");
-        video.style.display = "none";
+        video.setAttribute("autoplay", "");
+        video.setAttribute("muted", "");
+        video.muted = true;
+        video.style.cssText = "position:fixed;bottom:12px;left:12px;width:160px;height:120px;z-index:9999;border-radius:10px;border:1px solid #00ffaa44;opacity:0.7;transform:scaleX(-1);";
         document.body.appendChild(video);
         videoRef.current = video;
 
+        /* 3. Get webcam stream manually (most reliable) */
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" } });
+        streamRef.current = stream;
+        video.srcObject = stream;
+        await video.play();
+
+        if (cancelled) return;
+
+        /* 4. Initialize MediaPipe Hands */
         const hands = new Hands({
-          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
         });
         hands.setOptions({
           maxNumHands: 1,
           modelComplexity: 0,
-          minDetectionConfidence: 0.6,
-          minTrackingConfidence: 0.5,
+          minDetectionConfidence: 0.55,
+          minTrackingConfidence: 0.45,
         });
+
         hands.onResults((results) => {
           if (cancelled) return;
           if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
@@ -716,21 +736,35 @@ function useHandTracking(handRef, enabled) {
             const wrist = lm[0];
             const thumb = lm[4];
             const index = lm[8];
-            const dx = thumb.x - index.x;
-            const dy = thumb.y - index.y;
-            const pinchDist = Math.sqrt(dx * dx + dy * dy);
+            const middle = lm[12];
+            /* pinch = avg distance thumb-to-index and thumb-to-middle */
+            const d1 = Math.hypot(thumb.x - index.x, thumb.y - index.y);
+            const d2 = Math.hypot(thumb.x - middle.x, thumb.y - middle.y);
+            const pinchDist = (d1 + d2) / 2;
             handRef.current = { active: true, x: wrist.x, pinch: pinchDist };
           } else {
             handRef.current = { ...handRef.current, active: false };
           }
         });
 
-        const cam = new Camera(video, {
-          onFrame: async () => { await hands.send({ image: video }); },
-          width: 320, height: 240,
-        });
-        cameraRef.current = cam;
-        cam.start();
+        /* 5. Await full WASM initialization before sending frames */
+        await hands.initialize();
+        handsRef.current = hands;
+
+        if (cancelled) return;
+
+        /* 6. Manual frame loop (more reliable than Camera utility) */
+        let processing = false;
+        async function loop() {
+          if (cancelled) return;
+          if (!processing && video.readyState >= 2) {
+            processing = true;
+            try { await hands.send({ image: video }); } catch (e) { /* skip frame */ }
+            processing = false;
+          }
+          rafRef.current = requestAnimationFrame(loop);
+        }
+        loop();
       } catch (err) {
         console.warn("Hand tracking init failed:", err);
         handRef.current = { active: false, x: 0.5, pinch: 1 };
@@ -740,12 +774,10 @@ function useHandTracking(handRef, enabled) {
     init();
     return () => {
       cancelled = true;
-      if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
-      if (videoRef.current) {
-        videoRef.current.srcObject = null;
-        videoRef.current.remove();
-        videoRef.current = null;
-      }
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
+      if (videoRef.current) { videoRef.current.srcObject = null; videoRef.current.remove(); videoRef.current = null; }
+      if (handsRef.current) { try { handsRef.current.close(); } catch(e){} handsRef.current = null; }
     };
   }, [enabled, handRef]);
 }
@@ -753,6 +785,23 @@ function useHandTracking(handRef, enabled) {
 /* ═══════════════════════════════════════
    13. MAIN APP
    ═══════════════════════════════════════ */
+function HandStatus({ handRef }) {
+  const [active, setActive] = useState(false);
+  useEffect(() => {
+    const id = setInterval(() => { setActive(!!handRef.current?.active); }, 300);
+    return () => clearInterval(id);
+  }, [handRef]);
+  return (
+    <div style={{
+      position: "fixed", bottom: 60, right: 24, zIndex: 300,
+      fontSize: 10, color: active ? "#00ff88" : "#ff6644", letterSpacing: ".1em",
+      fontFamily: "Segoe UI,sans-serif", textShadow: active ? "0 0 10px #00ff88" : "none",
+    }}>
+      {active ? "\u{1F7E2} Hand Detected \u2014 Move hand to rotate DNA \u2022 Pinch to converge particles" : "\u{1F534} Waiting for hand... Show your palm to the camera"}
+    </div>
+  );
+}
+
 export default function App() {
   const [activeSkill, setActiveSkill] = useState(null);
   const [contactCard, setContactCard] = useState(false);
