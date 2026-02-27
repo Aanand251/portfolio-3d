@@ -47,6 +47,14 @@ const SKILLS = [
     desc: "Semantic markup, accessibility, Canvas API, SVG — the foundation of the web." },
 ];
 
+const PROJECTS_3D = [
+  { name: "Expense Tracker", color: "#00ff88", url: "https://github.com/Aanand251/personal-expense-tracker", tech: "Kotlin · Firebase", desc: "Smart expense tracking with Firebase sync." },
+  { name: "Zenith", color: "#aa88ff", url: "https://github.com/Aanand251/Zenith", tech: "Kotlin Multiplatform · SQL", desc: "Cross-platform music streaming with offline playlists." },
+  { name: "Talknest", color: "#ff8844", url: "https://github.com/Aanand251/Talknest", tech: "Kotlin · Firebase · FCM", desc: "Real-time chat with push notifications." },
+  { name: "NEON", color: "#ff44aa", url: "https://github.com/Aanand251/personal-voice-assistant", tech: "Kotlin · NLP · Speech", desc: "Personal voice assistant with NLU." },
+  { name: "Contact Me", color: "#00ffee", url: "mailto:choudharyaanandkumar251@gmail.com", tech: "GitHub: Aanand251", desc: "Email: choudharyaanandkumar251@gmail.com", isContact: true },
+];
+
 const PROJECTS = [
   {
     title: "Personal Expense Tracker",
@@ -99,12 +107,12 @@ function Lights() {
 /* ═══════════════════════════════════════
    3. DNA DOUBLE-HELIX (TubeGeometry)
    ═══════════════════════════════════════ */
-const HELIX_RUNGS = 60;
-const HELIX_RADIUS = 3.8;
-const HELIX_HEIGHT = 42;
-const HELIX_TURNS = 4.5;
+const HELIX_RUNGS = 55;
+const HELIX_RADIUS = 4.2;
+const HELIX_HEIGHT = 48;
+const HELIX_TURNS = 5;
 
-function DNAHelix({ onNodeClick, rotRef, handRef }) {
+function DNAHelix({ onNodeClick, rotRef, handRef, onContactClick }) {
   const grpRef = useRef();
 
   /* smooth backbone curves */
@@ -132,8 +140,8 @@ function DNAHelix({ onNodeClick, rotRef, handRef }) {
     };
   }, []);
 
-  const tube1 = useMemo(() => new THREE.TubeGeometry(curve1, 256, 0.12, 8, false), [curve1]);
-  const tube2 = useMemo(() => new THREE.TubeGeometry(curve2, 256, 0.12, 8, false), [curve2]);
+  const tube1 = useMemo(() => new THREE.TubeGeometry(curve1, 256, 0.18, 8, false), [curve1]);
+  const tube2 = useMemo(() => new THREE.TubeGeometry(curve2, 256, 0.18, 8, false), [curve2]);
 
   const BASE_X = 0.12;
 
@@ -186,13 +194,24 @@ function DNAHelix({ onNodeClick, rotRef, handRef }) {
         );
       })}
 
-      {/* skill nodes mapped to rungs */}
+      {/* skill nodes mapped to rungs — alternating strands */}
       {SKILLS.map((sk, idx) => {
-        const r = rungPairs[Math.floor((idx / SKILLS.length) * HELIX_RUNGS * 0.8) + 4];
+        const rIdx = Math.floor((idx / SKILLS.length) * HELIX_RUNGS * 0.7) + 3;
+        const r = rungPairs[rIdx];
         if (!r) return null;
-        /* place on strand A side */
-        const pos = [r.a.x, r.a.y, r.a.z];
+        const strand = idx % 2 === 0 ? r.a : r.b;
+        const pos = [strand.x, strand.y, strand.z];
         return <SkillNode key={sk.name} skill={sk} position={pos} onClick={() => onNodeClick(sk)} />;
+      })}
+
+      {/* project diamond orbs on DNA */}
+      {PROJECTS_3D.map((proj, idx) => {
+        const rIdx = Math.floor(((idx + SKILLS.length) / (SKILLS.length + PROJECTS_3D.length)) * HELIX_RUNGS * 0.8) + 3;
+        const r = rungPairs[Math.min(rIdx, rungPairs.length - 1)];
+        if (!r) return null;
+        const strand = idx % 2 === 0 ? r.b : r.a;
+        const pos = [strand.x, strand.y, strand.z];
+        return <ProjectOrb key={proj.name} project={proj} position={pos} onContactClick={onContactClick} />;
       })}
     </group>
   );
@@ -259,6 +278,79 @@ function SkillNode({ skill, position, onClick }) {
         font={undefined}
       >
         {skill.name}
+      </Text>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════
+   4b. PROJECT ORB — Diamond/Octahedron
+   ═══════════════════════════════════════ */
+function ProjectOrb({ project, position, onContactClick }) {
+  const grpRef = useRef();
+  const coreRef = useRef();
+  const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
+  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
+  const col = useMemo(() => new THREE.Color(project.color), [project.color]);
+
+  useFrame(({ clock }) => {
+    const t = clock.getElapsedTime();
+    if (coreRef.current) {
+      coreRef.current.rotation.y = t * 0.8 + phase;
+      coreRef.current.rotation.x = Math.sin(t * 0.5 + phase) * 0.3;
+      const pulse = 1 + Math.sin(t * 2.5 + phase) * 0.15;
+      const s = hovered ? 0.55 * pulse : 0.4 * pulse;
+      coreRef.current.scale.setScalar(s);
+      coreRef.current.material.emissiveIntensity = hovered ? 4 : 2 + Math.sin(t * 3 + phase) * 0.6;
+    }
+  });
+
+  const handleClick = (e) => {
+    e.stopPropagation();
+    if (project.isContact) {
+      onContactClick && onContactClick();
+    } else {
+      window.open(project.url, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  return (
+    <group ref={grpRef} position={position}>
+      <mesh ref={coreRef}>
+        <octahedronGeometry args={[1, 0]} />
+        <meshPhysicalMaterial
+          color={project.color}
+          emissive={project.color}
+          emissiveIntensity={2.5}
+          transparent
+          opacity={0.9}
+          roughness={0.1}
+          metalness={0.5}
+          clearcoat={1}
+          clearcoatRoughness={0.05}
+        />
+      </mesh>
+      {/* invisible hitbox */}
+      <mesh
+        visible={false}
+        onClick={handleClick}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <sphereGeometry args={[1.6, 16, 16]} />
+        <meshBasicMaterial />
+      </mesh>
+      <Text
+        position={[0, 1.2, 0]}
+        fontSize={0.32}
+        color={hovered ? "#ffffff" : project.color}
+        anchorX="center"
+        anchorY="bottom"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+      >
+        {project.name}
       </Text>
     </group>
   );
@@ -333,36 +425,42 @@ function ParticleSystem({ handRef }) {
     return arr;
   }, []);
 
-  useFrame(() => {
+  useFrame(({ clock }) => {
     if (!meshRef.current) return;
     const pinch = handRef?.current?.pinch ?? 1;
-
-    /* convergence centre */
-    const cx = 0, cy = 0, cz = 0;
+    const active = !!handRef?.current?.active;
+    const t = clock.getElapsedTime();
 
     for (let i = 0; i < PARTICLE_COUNT; i++) {
       const p = particles[i];
 
-      if (pinch < 0.06 && handRef?.current?.active) {
-        /* CONVERGE — pinched: gravity toward centre */
-        p.x += (cx - p.x) * 0.04;
-        p.y += (cy - p.y) * 0.04;
-        p.z += (cz - p.z) * 0.04;
-      } else if (pinch > 0.15 && handRef?.current?.active) {
-        /* DIVERGE — spread: explode back to original */
-        const force = Math.min(pinch * 2, 1);
-        p.x += (p.ox - p.x) * 0.02 * force;
-        p.y += (p.oy - p.y) * 0.02 * force;
-        p.z += (p.oz - p.z) * 0.02 * force;
+      if (active && pinch < 0.12) {
+        /* CONVERGE — fingers pinched: strong gravity toward centre */
+        const strength = 0.06 * (1 - pinch / 0.12);
+        p.x += (0 - p.x) * strength;
+        p.y += (0 - p.y) * strength;
+        p.z += (0 - p.z) * strength;
+      } else if (active && pinch > 0.18) {
+        /* DIVERGE — fingers spread: explode outward beyond original positions */
+        const force = Math.min(pinch * 3, 1.5);
+        const dx = p.ox * 1.5 - p.x, dy = p.oy * 1.5 - p.y, dz = p.oz * 1.5 - p.z;
+        p.x += dx * 0.04 * force;
+        p.y += dy * 0.04 * force;
+        p.z += dz * 0.04 * force;
       } else {
-        /* idle drift back gently */
-        p.x += (p.ox - p.x) * 0.005;
-        p.y += (p.oy - p.y) * 0.005;
-        p.z += (p.oz - p.z) * 0.005;
+        /* idle: gentle floating motion around original position */
+        const phase = i * 0.1 + t * 0.3;
+        const tx = p.ox + Math.sin(phase) * 2;
+        const ty = p.oy + Math.cos(phase * 0.7) * 2;
+        const tz = p.oz + Math.sin(phase * 0.5 + 1) * 2;
+        p.x += (tx - p.x) * 0.01;
+        p.y += (ty - p.y) * 0.01;
+        p.z += (tz - p.z) * 0.01;
       }
 
       dummy.position.set(p.x, p.y, p.z);
-      dummy.scale.setScalar(0.08 + Math.random() * 0.02);
+      const sc = 0.08 + Math.sin(t * 2 + i) * 0.02;
+      dummy.scale.setScalar(sc);
       dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
@@ -902,7 +1000,7 @@ export default function App() {
         <fog attach="fog" args={[BG, 35, 110]} />
         <color attach="background" args={[BG]} />
         <Lights />
-        <DNAHelix onNodeClick={handleNodeClick} rotRef={rotRef} handRef={handRef} />
+        <DNAHelix onNodeClick={handleNodeClick} rotRef={rotRef} handRef={handRef} onContactClick={() => setContactCard(true)} />
         <MatrixRain />
         <ParticleSystem handRef={handRef} />
         <SparkleSwarm />
