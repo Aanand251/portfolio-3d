@@ -1,741 +1,864 @@
-﻿import React, { useRef, useMemo, useState, useCallback } from "react";
-import { Canvas, useFrame, useThree } from "@react-three/fiber";
-import { Text, Billboard } from "@react-three/drei";
-import { EffectComposer, Bloom, Vignette } from "@react-three/postprocessing";
+﻿// ╔══════════════════════════════════════════════════════════════════════════════════╗
+// ║  AANAND KUMAR — 3D HOLOGRAPHIC CYBERPUNK PORTFOLIO                              ║
+// ║  Single-file React + R3F + AI Hand Tracking + Particle Physics                  ║
+// ║                                                                                  ║
+// ║  npm install react react-dom three @react-three/fiber @react-three/drei          ║
+// ║            @react-three/postprocessing @mediapipe/hands @mediapipe/camera_utils   ║
+// ╚══════════════════════════════════════════════════════════════════════════════════╝
+import React, {
+  useState, useRef, useMemo, useCallback, useEffect, memo,
+} from "react";
 import * as THREE from "three";
+import { Canvas, useFrame, useThree } from "@react-three/fiber";
+import { Text, useCursor, Float } from "@react-three/drei";
+import {
+  EffectComposer, Bloom, Vignette,
+} from "@react-three/postprocessing";
 
-/* ─────────────────────── PERSONAL DATA ─────────────────────── */
+/* ───────── colour constants ───────── */
+const BG = "#00020a";
+const CYAN = "#00eaff";
+const DEEP = "#003366";
+
+/* ═══════════════════════════════════════
+   1. PERSONAL DATA
+   ═══════════════════════════════════════ */
 const PERSONAL = {
   name: "AANAND KUMAR",
   role: "B.Tech CSE (3rd Year) | Android & Web Developer",
-  bio: "Passionate developer crafting seamless Android and Web applications. Expert in backend development with Java & Spring Boot, and cross-platform mobile development with Kotlin, Flutter & Dart. I build high-performance, scalable software solutions that solve real problems.",
+  bio:
+    "Passionate developer crafting seamless Android and Web applications. Expertise in backend (Java) and cross-platform mobile development (Kotlin, Flutter, Dart). My mission is to build fine, high-performance software solutions.",
   github: "Aanand251",
-  linkedin: "aanand-kumar-choudhary",
   email: "choudharyaanandkumar251@gmail.com",
-  college: "B.Tech Computer Science Engineering — 3rd Year",
-  location: "India",
 };
 
 const SKILLS = [
-  { name: "Java", pct: 95, color: "#00eaff", desc: "Core backend language — deep expertise in OOP, data structures, algorithms, concurrency, and enterprise application development." },
-  { name: "Spring Boot", pct: 90, color: "#00c8ff", desc: "Production-grade REST APIs, microservices architecture, Spring Security, JPA/Hibernate, and full-stack web applications." },
-  { name: "Kotlin", pct: 88, color: "#7b68ee", desc: "Primary Android development language. Proficient in Coroutines, Jetpack Compose, Kotlin Multiplatform (KMP), and Flow." },
-  { name: "Dart / Flutter", pct: 82, color: "#00ffd5", desc: "Cross-platform mobile development with Flutter for both iOS and Android from a single codebase." },
-  { name: "MongoDB", pct: 78, color: "#22cccc", desc: "NoSQL database design, complex aggregation pipelines, indexing strategies, and scalable document-based data storage." },
-  { name: "React", pct: 80, color: "#61dafb", desc: "Modern frontend with React Hooks, state management, component architecture, and Three.js / R3F 3D integration." },
-  { name: "Firebase", pct: 83, color: "#ffca28", desc: "Realtime Database, Firestore, Firebase Auth, Cloud Functions, and push notifications for Android apps." },
-  { name: "SQL", pct: 80, color: "#4ecdc4", desc: "Relational database design, complex queries, joins, stored procedures, and local SQLite for mobile apps." },
-];
-
-const PROJECTS_3D = [
-  { name: "Expense Tracker", color: "#00ff88", url: "https://github.com/Aanand251/personal-expense-tracker", tech: "Kotlin · Firebase", desc: "Android app to track personal finances with Firebase backend and Material You design." },
-  { name: "Zenith", color: "#aa88ff", url: "https://github.com/Aanand251/Zenith", tech: "Kotlin Multiplatform · SQL", desc: "Cross-platform music player sharing business logic between Android and iOS." },
-  { name: "Talknest", color: "#ff8844", url: "https://github.com/Aanand251/Talknest", tech: "Kotlin · Firebase · FCM", desc: "Real-time chat app with Firebase Realtime Database and push notifications." },
-  { name: "NEON", color: "#ff44aa", url: "https://github.com/Aanand251/personal-voice-assistant", tech: "Kotlin · NLP · Speech", desc: "Personal AI voice assistant for hands-free device control and smart commands." },
-  { name: "Contact Me", color: "#00ffcc", url: "mailto:choudharyaanandkumar251@gmail.com", tech: "GitHub: Aanand251", desc: "Email: choudharyaanandkumar251@gmail.com", isContact: true },
+  { name: "Java",         pct: 95, color: "#00eaff",
+    desc: "Core language for Spring Boot backends, Android apps & data-structure mastery." },
+  { name: "Kotlin",       pct: 90, color: "#a855f7",
+    desc: "Primary Android language — Coroutines, Jetpack Compose, Multiplatform." },
+  { name: "Dart / Flutter",pct: 85, color: "#00ffd5",
+    desc: "Cross-platform mobile UI — beautiful, natively compiled apps from one codebase." },
+  { name: "MongoDB",      pct: 78, color: "#22cccc",
+    desc: "NoSQL document DB — schema-less design, aggregation pipelines, Atlas Cloud." },
+  { name: "React",        pct: 80, color: "#61dafb",
+    desc: "Component-driven SPAs, hooks, state management, React Three Fiber 3D." },
+  { name: "HTML",         pct: 92, color: "#ff6644",
+    desc: "Semantic markup, accessibility, Canvas API, SVG — the foundation of the web." },
 ];
 
 const PROJECTS = [
   {
     title: "Personal Expense Tracker",
     tech: ["Kotlin", "Firebase", "Android", "Material You"],
-    desc: "A sleek Android app to track personal finances in real time. Features category-wise expense breakdown, Firebase Realtime Database sync, and Material You dynamic theming.",
+    desc:
+      "Track daily expenses with smart categorisation, Firebase real-time sync, and beautiful Material You charts.",
     url: "https://github.com/Aanand251/personal-expense-tracker",
-    icon: "💰",
+    icon: "\uD83D\uDCB0",
   },
   {
     title: "Zenith",
     tech: ["Kotlin Multiplatform", "SQL", "iOS", "Android"],
-    desc: "Cross-platform music player built with Kotlin Multiplatform sharing business logic between Android and iOS. Local SQL database for playlists and track metadata.",
+    desc:
+      "Cross-platform music streaming app with offline playlists, equaliser, and KMP shared logic.",
     url: "https://github.com/Aanand251/Zenith",
-    icon: "🎵",
+    icon: "\uD83C\uDFB5",
   },
   {
     title: "Talknest",
     tech: ["Kotlin", "Firebase", "Realtime DB", "FCM"],
-    desc: "Real-time chat application with Firebase Realtime Database, end-to-end message delivery, Firebase Cloud Messaging push notifications, and user presence indicators.",
+    desc:
+      "Real-time chat application with push notifications, media sharing, and end-to-end encryption layer.",
     url: "https://github.com/Aanand251/Talknest",
-    icon: "💬",
+    icon: "\uD83D\uDCAC",
   },
   {
-    title: "NEON — Voice Assistant",
+    title: "NEON \u2014 Voice Assistant",
     tech: ["Kotlin", "Speech Recognition", "NLP", "Android"],
-    desc: "Personal AI voice assistant powered by Android Speech Recognition and NLP. Supports hands-free device control, custom commands, reminders, and web searches.",
+    desc:
+      "Personal voice assistant with natural-language understanding, app control, and smart replies.",
     url: "https://github.com/Aanand251/personal-voice-assistant",
-    icon: "🤖",
+    icon: "\uD83E\uDD16",
   },
 ];
 
-/* ─────────────────── 3D SCENE CONSTANTS ─────────────────── */
-const BG = "#00020a";
-const DNA_R = 5.0, DNA_H = 32, DNA_TURNS = 4, DNA_SEG = 300, DNA_RUNGS = 55;
-const UP = new THREE.Vector3(0, 1, 0);
-const BIN_COUNT = 4500, SPARK_COUNT = 280;
+/* ═══════════════════════════════════════
+   2. LIGHTS
+   ═══════════════════════════════════════ */
+function Lights() {
+  return (
+    <>
+      <ambientLight intensity={0.15} />
+      <directionalLight position={[8, 12, 10]} intensity={0.7} color="#88ccff" />
+      <pointLight position={[-6, -8, 6]} intensity={0.9} color="#00eaff" distance={60} />
+      <pointLight position={[6, 8, -4]} intensity={0.5} color="#a855f7" distance={50} />
+    </>
+  );
+}
 
-/* ══════════════════════════════════════════════════════════
-   DNA HELIX
-══════════════════════════════════════════════════════════ */
-function DNAHelix({ onNodeClick, rotRef, onContactClick }) {
+/* ═══════════════════════════════════════
+   3. DNA DOUBLE-HELIX (TubeGeometry)
+   ═══════════════════════════════════════ */
+const HELIX_RUNGS = 60;
+const HELIX_RADIUS = 3.8;
+const HELIX_HEIGHT = 42;
+const HELIX_TURNS = 4.5;
+
+function DNAHelix({ onNodeClick, rotRef, handRef }) {
   const grpRef = useRef();
 
-  const { curve1, curve2, rungData } = useMemo(() => {
-    const p1 = [], p2 = [];
-    for (let i = 0; i <= DNA_SEG; i++) {
-      const t = i / DNA_SEG, a = t * DNA_TURNS * Math.PI * 2, y = t * DNA_H - DNA_H / 2;
-      p1.push(new THREE.Vector3(Math.cos(a) * DNA_R, y, Math.sin(a) * DNA_R));
-      p2.push(new THREE.Vector3(Math.cos(a + Math.PI) * DNA_R, y, Math.sin(a + Math.PI) * DNA_R));
+  /* smooth backbone curves */
+  const { curve1, curve2, rungPairs } = useMemo(() => {
+    const pts1 = [], pts2 = [], rungs = [];
+    for (let i = 0; i <= 300; i++) {
+      const t = i / 300;
+      const y = t * HELIX_HEIGHT - HELIX_HEIGHT / 2;
+      const angle = t * Math.PI * 2 * HELIX_TURNS;
+      pts1.push(new THREE.Vector3(Math.cos(angle) * HELIX_RADIUS, y, Math.sin(angle) * HELIX_RADIUS));
+      pts2.push(new THREE.Vector3(Math.cos(angle + Math.PI) * HELIX_RADIUS, y, Math.sin(angle + Math.PI) * HELIX_RADIUS));
     }
-    const c1 = new THREE.CatmullRomCurve3(p1), c2 = new THREE.CatmullRomCurve3(p2);
-    const rungs = [];
-    for (let i = 0; i < DNA_RUNGS; i++) {
-      const t = i / (DNA_RUNGS - 1);
-      const a = c1.getPoint(t), b = c2.getPoint(t);
-      const dir = new THREE.Vector3().subVectors(b, a);
-      const len = dir.length();
-      const mid = new THREE.Vector3().addVectors(a, b).multiplyScalar(0.5);
-      const quat = new THREE.Quaternion().setFromUnitVectors(UP, dir.clone().normalize());
-      rungs.push({ mid, quat, len, p1: a.clone(), p2: b.clone() });
+    for (let i = 0; i < HELIX_RUNGS; i++) {
+      const t = (i + 0.5) / HELIX_RUNGS;
+      const y = t * HELIX_HEIGHT - HELIX_HEIGHT / 2;
+      const angle = t * Math.PI * 2 * HELIX_TURNS;
+      const a = new THREE.Vector3(Math.cos(angle) * HELIX_RADIUS, y, Math.sin(angle) * HELIX_RADIUS);
+      const b = new THREE.Vector3(Math.cos(angle + Math.PI) * HELIX_RADIUS, y, Math.sin(angle + Math.PI) * HELIX_RADIUS);
+      rungs.push({ a, b, mid: a.clone().lerp(b, 0.5), t });
     }
-    return { curve1: c1, curve2: c2, rungData: rungs };
+    return {
+      curve1: new THREE.CatmullRomCurve3(pts1),
+      curve2: new THREE.CatmullRomCurve3(pts2),
+      rungPairs: rungs,
+    };
   }, []);
 
-  const tube1 = useMemo(() => new THREE.TubeGeometry(curve1, DNA_SEG, 0.09, 12, false), [curve1]);
-  const tube2 = useMemo(() => new THREE.TubeGeometry(curve2, DNA_SEG, 0.09, 12, false), [curve2]);
-  const glow1 = useMemo(() => new THREE.TubeGeometry(curve1, 80, 0.28, 8, false), [curve1]);
-  const glow2 = useMemo(() => new THREE.TubeGeometry(curve2, 80, 0.28, 8, false), [curve2]);
-  const rungGeos = useMemo(() => rungData.map(r => new THREE.CylinderGeometry(0.03, 0.03, r.len, 8)), [rungData]);
-  const capGeo = useMemo(() => new THREE.SphereGeometry(0.1, 10, 8), []);
-  const rc = [0x00ffcc, 0x0088ff, 0xff6688, 0xffcc00];
+  const tube1 = useMemo(() => new THREE.TubeGeometry(curve1, 256, 0.12, 8, false), [curve1]);
+  const tube2 = useMemo(() => new THREE.TubeGeometry(curve2, 256, 0.12, 8, false), [curve2]);
+
+  const BASE_X = 0.12;
 
   useFrame((_, dt) => {
     if (!grpRef.current) return;
-    const BASE_X = 0.12;
-    if (rotRef) {
-      const isDragging = rotRef.current.dragging;
-      grpRef.current.rotation.y += rotRef.current.dy * 0.012;
-      grpRef.current.rotation.x += rotRef.current.dx * 0.012;
-      grpRef.current.rotation.y += rotRef.current.scroll * 0.025;
-      rotRef.current.dy *= 0.88;
-      rotRef.current.dx *= 0.88;
-      rotRef.current.scroll *= 0.88;
-      // spring-back X toward default tilt when drag released and velocity gone
-      if (!isDragging && Math.abs(rotRef.current.dx) < 0.08) {
-        grpRef.current.rotation.x += (BASE_X - grpRef.current.rotation.x) * 0.035;
-      }
-    }
-    const activity = rotRef ? Math.abs(rotRef.current.dy) + Math.abs(rotRef.current.scroll) : 0;
-    grpRef.current.rotation.y += 0.18 * dt * Math.max(0, 1 - activity);
-  });
+    const g = grpRef.current;
 
-  return (
-    <group ref={grpRef} rotation={[0.12, 0, 0]}>
-      <mesh geometry={tube1}><meshPhysicalMaterial color={0x00aaff} emissive={0x003366} emissiveIntensity={0.8} metalness={0.55} roughness={0.1} clearcoat={1} clearcoatRoughness={0.03} transparent opacity={0.92} /></mesh>
-      <mesh geometry={tube2}><meshPhysicalMaterial color={0x00ffcc} emissive={0x003322} emissiveIntensity={0.8} metalness={0.55} roughness={0.1} clearcoat={1} clearcoatRoughness={0.03} transparent opacity={0.92} /></mesh>
-      <mesh geometry={glow1}><meshBasicMaterial color={0x0066aa} side={THREE.BackSide} transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      <mesh geometry={glow2}><meshBasicMaterial color={0x00aa66} side={THREE.BackSide} transparent opacity={0.06} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      {rungData.map((r, i) => (
-        <React.Fragment key={i}>
-          <mesh position={r.mid} quaternion={r.quat} geometry={rungGeos[i]}><meshPhysicalMaterial color={rc[i%4]} emissive={rc[i%4]} emissiveIntensity={0.5} metalness={0.3} roughness={0.2} clearcoat={0.6} transparent opacity={0.85} /></mesh>
-          <mesh position={r.p1} geometry={capGeo}><meshPhysicalMaterial color={rc[i%4]} emissive={rc[i%4]} emissiveIntensity={0.4} /></mesh>
-          <mesh position={r.p2} geometry={capGeo}><meshPhysicalMaterial color={rc[(i+2)%4]} emissive={rc[(i+2)%4]} emissiveIntensity={0.4} /></mesh>
-        </React.Fragment>
-      ))}
-      {SKILLS.map((sk, i) => {
-        const t = i / (SKILLS.length - 1 || 1);
-        const a = t * DNA_TURNS * Math.PI * 2;
-        const y = t * DNA_H - DNA_H / 2;
-        const pos = i % 2 === 0
-          ? [Math.cos(a) * DNA_R, y, Math.sin(a) * DNA_R]
-          : [Math.cos(a + Math.PI) * DNA_R, y, Math.sin(a + Math.PI) * DNA_R];
-        return <SkillOrb key={sk.name} skill={sk} position={pos} onClick={() => onNodeClick(sk)} />;
-      })}
-      {PROJECTS_3D.map((proj, i) => {
-        const t = i / (PROJECTS_3D.length - 1 || 1);
-        const a = t * DNA_TURNS * Math.PI * 2 + Math.PI * 0.5;
-        const y = t * DNA_H - DNA_H / 2;
-        const r = DNA_R + 4.5;
-        const pos = [Math.cos(a) * r, y, Math.sin(a) * r];
-        return <ProjectOrb key={proj.name} project={proj} position={pos} onContactClick={onContactClick} />;
-      })}
-    </group>
-  );
-}
-
-/* ══════════════════════════════════════════════════════════
-   SKILL ORB  (clickable, hoverable)
-══════════════════════════════════════════════════════════ */
-function SkillOrb({ skill, position, onClick }) {
-  const grpRef = useRef();
-  const coreRef = useRef();
-  const [hovered, setHovered] = useState(false);
-  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
-  const speed = useMemo(() => 0.7 + Math.random() * 0.8, []);
-  const sz = 0.22 + (skill.pct / 100) * 0.26;
-  const col = useMemo(() => new THREE.Color(skill.color), [skill.color]);
-  const posV = useMemo(() => new THREE.Vector3(...position), [position]);
-
-  const labelOff = useMemo(() => {
-    const rd = posV.clone().setY(0).normalize();
-    const lp = posV.clone().add(rd.multiplyScalar(3.8));
-    return [lp.x - position[0], lp.y - position[1] + 0.45, lp.z - position[2]];
-  }, [posV, position]);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    const p = Math.sin(t * speed + phase);
-    if (coreRef.current) coreRef.current.material.emissiveIntensity = hovered ? 5.0 : 2.0 + p * 1.5;
-    if (grpRef.current) {
-      const s = hovered ? 1.6 : 1 + p * 0.08;
-      grpRef.current.scale.setScalar(s);
-    }
-  });
-
-  return (
-    <group ref={grpRef} position={position}>
-      <mesh
-        ref={coreRef}
-        onClick={(e) => { e.stopPropagation(); onClick(); }}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-      >
-        <sphereGeometry args={[sz, 28, 28]} />
-        <meshPhysicalMaterial color={col} emissive={col} emissiveIntensity={2.4} metalness={0} roughness={0} clearcoat={1} clearcoatRoughness={0} transmission={0.3} transparent opacity={0.95} />
-      </mesh>
-      <mesh><sphereGeometry args={[sz * 0.32, 12, 12]} /><meshBasicMaterial color="white" transparent opacity={0.65} /></mesh>
-      <mesh><sphereGeometry args={[sz * 2.0, 14, 14]} /><meshBasicMaterial color={skill.color} side={THREE.BackSide} transparent opacity={hovered ? 0.35 : 0.22} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      <mesh><sphereGeometry args={[sz * 3.8, 10, 10]} /><meshBasicMaterial color={skill.color} side={THREE.BackSide} transparent opacity={0.09} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      <Billboard position={labelOff}>
-        <Text fontSize={0.36} color={skill.color} anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000a14">
-          {skill.name.toUpperCase()}
-        </Text>
-        <Text position={[0, -0.32, 0]} fontSize={0.22} color="#88ddff" anchorX="center" anchorY="middle">
-          {skill.pct + "%"}
-        </Text>
-      </Billboard>
-    </group>
-  );
-}
-
-
-/* ══════════════════════════════════════════════════════════
-   PROJECT ORB  ({project.isContact ? "CLICK TO EMAIL" : "CLICK TO OPEN"} GitHub)
-══════════════════════════════════════════════════════════ */
-function ProjectOrb({ project, position, onContactClick }) {
-  const grpRef = useRef();
-  const coreRef = useRef();
-  const [hovered, setHovered] = useState(false);
-  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
-  const col = useMemo(() => new THREE.Color(project.color), [project.color]);
-  const posV = useMemo(() => new THREE.Vector3(...position), [position]);
-
-  const labelOff = useMemo(() => {
-    const rd = posV.clone().setY(0).normalize();
-    const lp = posV.clone().add(rd.multiplyScalar(3.2));
-    return [lp.x - position[0], lp.y - position[1] + 0.55, lp.z - position[2]];
-  }, [posV, position]);
-
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    const p = Math.sin(t * 1.2 + phase);
-    if (coreRef.current) coreRef.current.material.emissiveIntensity = hovered ? 5.5 : 1.8 + p * 1.2;
-    if (grpRef.current) {
-      const s = hovered ? 1.55 : 1 + p * 0.1;
-      grpRef.current.scale.setScalar(s);
-    }
-  });
-
-  const handleClick = (e) => {
-    e.stopPropagation();
-    if (project.isContact) {
-      onContactClick && onContactClick(project);
+    /* hand tracking rotation override */
+    if (handRef?.current?.active) {
+      const targetY = (handRef.current.x - 0.5) * Math.PI * 2;
+      g.rotation.y += (targetY - g.rotation.y) * 0.08;
     } else {
-      window.open(project.url, "_blank", "noopener,noreferrer");
+      /* auto-spin + manual drag/scroll */
+      g.rotation.y += 0.12 * dt + rotRef.current.dy * 0.01 + rotRef.current.scroll * 0.002;
     }
-  };
+    rotRef.current.dy *= 0.92;
+    rotRef.current.scroll *= 0.9;
+
+    /* X drag + spring-back */
+    g.rotation.x += rotRef.current.dx * 0.01;
+    rotRef.current.dx *= 0.92;
+    if (!rotRef.current.dragging) {
+      g.rotation.x += (BASE_X - g.rotation.x) * 0.03;
+    }
+  });
 
   return (
-    <group ref={grpRef} position={position}>
-      {/* Diamond/cube shape to distinguish from skill orbs */}
-      <mesh
-        ref={coreRef}
-        onClick={handleClick}
-        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); document.body.style.cursor = "pointer"; }}
-        onPointerOut={() => { setHovered(false); document.body.style.cursor = "auto"; }}
-      >
-        <octahedronGeometry args={[0.42, 0]} />
-        <meshPhysicalMaterial color={col} emissive={col} emissiveIntensity={1.8} metalness={0.2} roughness={0.05} clearcoat={1} clearcoatRoughness={0} transparent opacity={0.92} />
+    <group ref={grpRef} rotation={[BASE_X, 0, 0]}>
+      {/* backbone strands */}
+      <mesh geometry={tube1}>
+        <meshStandardMaterial color="#00aaff" emissive="#003366" emissiveIntensity={1.4} transparent opacity={0.6} roughness={0.3} />
       </mesh>
-      {/* Inner bright core */}
-      <mesh><sphereGeometry args={[0.14, 10, 10]} /><meshBasicMaterial color="white" transparent opacity={0.7} /></mesh>
-      {/* Outer glow rings */}
-      <mesh><octahedronGeometry args={[0.85, 0]} /><meshBasicMaterial color={project.color} side={THREE.BackSide} transparent opacity={hovered ? 0.3 : 0.18} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      <mesh><sphereGeometry args={[1.6, 10, 10]} /><meshBasicMaterial color={project.color} side={THREE.BackSide} transparent opacity={0.08} blending={THREE.AdditiveBlending} depthWrite={false} /></mesh>
-      {/* Label */}
-      <Billboard position={labelOff}>
-        <Text fontSize={0.34} color={project.color} anchorX="center" anchorY="middle" outlineWidth={0.02} outlineColor="#000a14">
-          {project.name.toUpperCase()}
-        </Text>
-        <Text position={[0, -0.30, 0]} fontSize={0.19} color="#aaddee" anchorX="center" anchorY="middle">
-          {project.tech}
-        </Text>
-        <Text position={[0, -0.55, 0]} fontSize={0.17} color="#336655" anchorX="center" anchorY="middle">
-          {project.isContact ? "CLICK TO EMAIL" : "CLICK TO OPEN"}
-        </Text>
-      </Billboard>
+      <mesh geometry={tube2}>
+        <meshStandardMaterial color="#8855ff" emissive="#220055" emissiveIntensity={1.4} transparent opacity={0.6} roughness={0.3} />
+      </mesh>
+
+      {/* rungs (bars between strands) */}
+      {rungPairs.map((r, i) => {
+        const dir = r.b.clone().sub(r.a);
+        const len = dir.length();
+        const mid = r.a.clone().lerp(r.b, 0.5);
+        const quat = new THREE.Quaternion().setFromUnitVectors(
+          new THREE.Vector3(0, 1, 0), dir.clone().normalize()
+        );
+        return (
+          <mesh key={`rung-${i}`} position={mid} quaternion={quat}>
+            <cylinderGeometry args={[0.04, 0.04, len, 6]} />
+            <meshStandardMaterial color="#00ddff" emissive="#004466" emissiveIntensity={0.8} transparent opacity={0.35} />
+          </mesh>
+        );
+      })}
+
+      {/* skill nodes mapped to rungs */}
+      {SKILLS.map((sk, idx) => {
+        const r = rungPairs[Math.floor((idx / SKILLS.length) * HELIX_RUNGS * 0.8) + 4];
+        if (!r) return null;
+        /* place on strand A side */
+        const pos = [r.a.x, r.a.y, r.a.z];
+        return <SkillNode key={sk.name} skill={sk} position={pos} onClick={() => onNodeClick(sk)} />;
+      })}
     </group>
   );
 }
-/* ══════════════════════════════════════════════════════════
-   MATRIX RAIN
-══════════════════════════════════════════════════════════ */
+
+/* ═══════════════════════════════════════
+   4. SKILL NODE — Bulletproof Hitbox
+   ═══════════════════════════════════════ */
+function SkillNode({ skill, position, onClick }) {
+  const [hovered, setHovered] = useState(false);
+  useCursor(hovered);
+  const coreRef = useRef();
+  const phase = useMemo(() => Math.random() * Math.PI * 2, []);
+  const col = useMemo(() => new THREE.Color(skill.color), [skill.color]);
+  const sz = 0.25 + (skill.pct / 100) * 0.3;
+
+  useFrame(({ clock }) => {
+    if (!coreRef.current) return;
+    const t = clock.getElapsedTime();
+    const pulse = 1 + Math.sin(t * 2 + phase) * 0.12;
+    const s = hovered ? sz * 1.35 * pulse : sz * pulse;
+    coreRef.current.scale.setScalar(s);
+    coreRef.current.material.emissiveIntensity = hovered ? 3.5 : 1.8 + Math.sin(t * 3 + phase) * 0.5;
+  });
+
+  return (
+    <group position={position}>
+      {/* visible glowing sphere */}
+      <mesh ref={coreRef}>
+        <sphereGeometry args={[1, 32, 32]} />
+        <meshPhysicalMaterial
+          color={skill.color}
+          emissive={skill.color}
+          emissiveIntensity={2}
+          transparent
+          opacity={0.85}
+          roughness={0.15}
+          metalness={0.3}
+          clearcoat={1}
+          clearcoatRoughness={0.1}
+        />
+      </mesh>
+
+      {/* INVISIBLE large hitbox sphere for bulletproof clicking */}
+      <mesh
+        visible={false}
+        onClick={(e) => { e.stopPropagation(); onClick(); }}
+        onPointerOver={(e) => { e.stopPropagation(); setHovered(true); }}
+        onPointerOut={() => setHovered(false)}
+      >
+        <sphereGeometry args={[1.8, 16, 16]} />
+        <meshBasicMaterial />
+      </mesh>
+
+      {/* skill label */}
+      <Text
+        position={[0, 1.1, 0]}
+        fontSize={0.38}
+        color={hovered ? "#ffffff" : skill.color}
+        anchorX="center"
+        anchorY="bottom"
+        outlineWidth={0.02}
+        outlineColor="#000000"
+        font={undefined}
+      >
+        {skill.name}
+      </Text>
+    </group>
+  );
+}
+
+/* ═══════════════════════════════════════
+   5. MATRIX BINARY RAIN (InstancedMesh)
+   ═══════════════════════════════════════ */
+const RAIN_COUNT = 800;
 function MatrixRain() {
   const meshRef = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
+
   const data = useMemo(() => {
-    const pos = [], vel = [], sc = [];
-    for (let i = 0; i < BIN_COUNT; i++) {
-      const a = Math.random() * Math.PI * 2, d = 12 + Math.random() * 50;
-      pos.push(new THREE.Vector3(Math.cos(a)*d, (Math.random()-0.5)*DNA_H*2.5, Math.sin(a)*d - 15));
-      vel.push(-(0.02 + Math.random() * 0.06));
-      sc.push(0.3 + Math.random() * 0.5);
+    const arr = [];
+    for (let i = 0; i < RAIN_COUNT; i++) {
+      arr.push({
+        x: (Math.random() - 0.5) * 120,
+        y: Math.random() * 80 - 40,
+        z: -20 - Math.random() * 60,
+        speed: 1.5 + Math.random() * 4,
+        char: Math.random() > 0.5 ? "1" : "0",
+      });
     }
-    return { pos, vel, sc };
+    return arr;
   }, []);
-  const tex = useMemo(() => {
-    const c = document.createElement("canvas"); c.width = 64; c.height = 64;
-    const ctx = c.getContext("2d"); ctx.clearRect(0,0,64,64);
-    ctx.fillStyle = "#0055cc"; ctx.font = "bold 36px monospace";
-    ctx.textAlign = "center"; ctx.textBaseline = "middle";
-    ctx.fillText(Math.random() > 0.5 ? "1" : "0", 32, 32);
-    return new THREE.CanvasTexture(c);
-  }, []);
-  const geo = useMemo(() => new THREE.PlaneGeometry(1, 1), []);
-  useFrame(() => {
+
+  useFrame((_, dt) => {
     if (!meshRef.current) return;
-    const hB = DNA_H * 1.3;
-    for (let i = 0; i < BIN_COUNT; i++) {
-      const p = data.pos[i]; p.y += data.vel[i];
-      if (p.y < -hB) { p.y = hB; p.x = (Math.random()-0.5)*120; p.z = -15+(Math.random()-0.5)*80; }
-      dummy.position.copy(p); const s = data.sc[i]; dummy.scale.set(s, s, 1); dummy.updateMatrix();
+    for (let i = 0; i < RAIN_COUNT; i++) {
+      const d = data[i];
+      d.y -= d.speed * dt * 3;
+      if (d.y < -40) d.y = 40 + Math.random() * 10;
+      dummy.position.set(d.x, d.y, d.z);
+      dummy.rotation.set(0, 0, 0);
+      dummy.scale.setScalar(0.15 + Math.random() * 0.05);
+      dummy.updateMatrix();
       meshRef.current.setMatrixAt(i, dummy.matrix);
     }
     meshRef.current.instanceMatrix.needsUpdate = true;
   });
+
   return (
-    <instancedMesh ref={meshRef} args={[geo, null, BIN_COUNT]}>
-      <meshBasicMaterial map={tex} transparent opacity={0.4} side={THREE.DoubleSide} blending={THREE.AdditiveBlending} depthWrite={false} />
+    <instancedMesh ref={meshRef} args={[undefined, undefined, RAIN_COUNT]}>
+      <planeGeometry args={[0.6, 0.6]} />
+      <meshBasicMaterial color="#00ff66" transparent opacity={0.18} side={THREE.DoubleSide} />
     </instancedMesh>
   );
 }
 
-/* ══════════════════════════════════════════════════════════
-   SPARKLE SWARM
-══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   6. PARTICLE PHYSICS SYSTEM (InstancedMesh)
+      Converge/Diverge with hand pinch
+   ═══════════════════════════════════════ */
+const PARTICLE_COUNT = 600;
+function ParticleSystem({ handRef }) {
+  const meshRef = useRef();
+  const dummy = useMemo(() => new THREE.Object3D(), []);
+
+  const particles = useMemo(() => {
+    const arr = [];
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const origX = (Math.random() - 0.5) * 50;
+      const origY = (Math.random() - 0.5) * 50;
+      const origZ = (Math.random() - 0.5) * 50;
+      arr.push({
+        ox: origX, oy: origY, oz: origZ,
+        x: origX, y: origY, z: origZ,
+        vx: 0, vy: 0, vz: 0,
+      });
+    }
+    return arr;
+  }, []);
+
+  useFrame(() => {
+    if (!meshRef.current) return;
+    const pinch = handRef?.current?.pinch ?? 1;
+
+    /* convergence centre */
+    const cx = 0, cy = 0, cz = 0;
+
+    for (let i = 0; i < PARTICLE_COUNT; i++) {
+      const p = particles[i];
+
+      if (pinch < 0.06 && handRef?.current?.active) {
+        /* CONVERGE — pinched: gravity toward centre */
+        p.x += (cx - p.x) * 0.04;
+        p.y += (cy - p.y) * 0.04;
+        p.z += (cz - p.z) * 0.04;
+      } else if (pinch > 0.15 && handRef?.current?.active) {
+        /* DIVERGE — spread: explode back to original */
+        const force = Math.min(pinch * 2, 1);
+        p.x += (p.ox - p.x) * 0.02 * force;
+        p.y += (p.oy - p.y) * 0.02 * force;
+        p.z += (p.oz - p.z) * 0.02 * force;
+      } else {
+        /* idle drift back gently */
+        p.x += (p.ox - p.x) * 0.005;
+        p.y += (p.oy - p.y) * 0.005;
+        p.z += (p.oz - p.z) * 0.005;
+      }
+
+      dummy.position.set(p.x, p.y, p.z);
+      dummy.scale.setScalar(0.08 + Math.random() * 0.02);
+      dummy.updateMatrix();
+      meshRef.current.setMatrixAt(i, dummy.matrix);
+    }
+    meshRef.current.instanceMatrix.needsUpdate = true;
+  });
+
+  return (
+    <instancedMesh ref={meshRef} args={[undefined, undefined, PARTICLE_COUNT]}>
+      <sphereGeometry args={[1, 6, 6]} />
+      <meshBasicMaterial color="#00eaff" transparent opacity={0.35} />
+    </instancedMesh>
+  );
+}
+
+/* ═══════════════════════════════════════
+   7. SPARKLE SWARM (ambient floating dust)
+   ═══════════════════════════════════════ */
+const SPARKLE_COUNT = 250;
 function SparkleSwarm() {
   const ref = useRef();
   const dummy = useMemo(() => new THREE.Object3D(), []);
-  const { camera } = useThree();
-  const data = useMemo(() => {
-    const h=[],p=[],v=[],ph=[],sp=[],sz=[];
-    for (let i = 0; i < SPARK_COUNT; i++) {
-      const a = Math.random()*Math.PI*2, r = DNA_R+(Math.random()-0.5)*7, y = (Math.random()-0.5)*DNA_H;
-      const home = new THREE.Vector3(Math.cos(a)*r, y, Math.sin(a)*r);
-      h.push(home.clone()); p.push(home.clone());
-      v.push(new THREE.Vector3((Math.random()-0.5)*0.02,(Math.random()-0.5)*0.015,(Math.random()-0.5)*0.02));
-      ph.push(Math.random()*Math.PI*2); sp.push(1.5+Math.random()*2.5); sz.push(0.06+Math.random()*0.18);
+  const sparks = useMemo(() => {
+    const a = [];
+    for (let i = 0; i < SPARKLE_COUNT; i++) {
+      a.push({
+        x: (Math.random() - 0.5) * 80,
+        y: (Math.random() - 0.5) * 60,
+        z: (Math.random() - 0.5) * 80,
+        s: 0.03 + Math.random() * 0.06,
+        sp: 0.3 + Math.random() * 0.8,
+        ph: Math.random() * Math.PI * 2,
+      });
     }
-    return {h,p,v,ph,sp,sz};
+    return a;
   }, []);
-  const geo = useMemo(() => new THREE.SphereGeometry(1, 6, 6), []);
-  useFrame(({ pointer, clock }) => {
+
+  useFrame(({ clock }) => {
     if (!ref.current) return;
     const t = clock.getElapsedTime();
-    const vec = new THREE.Vector3(pointer.x, pointer.y, 0.5).unproject(camera);
-    const dir = vec.sub(camera.position).normalize();
-    const dist = -camera.position.z / dir.z;
-    const mw = camera.position.clone().addScaledVector(dir, dist);
-    for (let i = 0; i < SPARK_COUNT; i++) {
-      const pos = data.p[i], vel = data.v[i], home = data.h[i];
-      const dx=pos.x-mw.x, dy=pos.y-mw.y, dz=pos.z-mw.z;
-      const d = Math.sqrt(dx*dx+dy*dy+dz*dz);
-      if (d < 8 && d > 0.01) { const f=0.08*(1-d/8); vel.x+=(dx/d)*f; vel.y+=(dy/d)*f; vel.z+=(dz/d)*f; }
-      vel.x+=(home.x-pos.x)*0.016; vel.y+=(home.y-pos.y)*0.016; vel.z+=(home.z-pos.z)*0.016;
-      vel.multiplyScalar(0.87); pos.add(vel);
-      const sc = data.sz[i]*(0.7+0.3*Math.sin(t*data.sp[i]+data.ph[i]));
-      dummy.position.copy(pos); dummy.scale.setScalar(sc); dummy.updateMatrix();
+    for (let i = 0; i < SPARKLE_COUNT; i++) {
+      const p = sparks[i];
+      dummy.position.set(
+        p.x + Math.sin(t * p.sp + p.ph) * 1.5,
+        p.y + Math.cos(t * p.sp * 0.7 + p.ph) * 1.2,
+        p.z + Math.sin(t * p.sp * 0.5 + p.ph + 1) * 1.5
+      );
+      const sc = p.s * (0.7 + Math.sin(t * 3 + p.ph) * 0.3);
+      dummy.scale.setScalar(sc);
+      dummy.updateMatrix();
       ref.current.setMatrixAt(i, dummy.matrix);
     }
     ref.current.instanceMatrix.needsUpdate = true;
   });
+
   return (
-    <instancedMesh ref={ref} args={[geo, null, SPARK_COUNT]}>
-      <meshBasicMaterial color={0x00eeff} transparent opacity={0.75} blending={THREE.AdditiveBlending} depthWrite={false} />
+    <instancedMesh ref={ref} args={[undefined, undefined, SPARKLE_COUNT]}>
+      <sphereGeometry args={[1, 6, 6]} />
+      <meshBasicMaterial color="#88ddff" transparent opacity={0.4} />
     </instancedMesh>
   );
 }
 
-/* ──────────── LIGHTS ──────────── */
-function Lights() {
-  const k=useRef(), f=useRef(), r=useRef();
-  useFrame(({ clock }) => {
-    const t = clock.getElapsedTime();
-    if(k.current) k.current.position.set(Math.cos(t*0.25)*20, Math.sin(t*0.18)*12, Math.sin(t*0.25)*20);
-    if(f.current) f.current.position.set(Math.cos(t*0.3+2)*16, Math.sin(t*0.22)*10, Math.sin(t*0.3+2)*16);
-    if(r.current) r.current.position.set(Math.cos(t*0.19+4)*12, Math.cos(t*0.28)*8, Math.sin(t*0.19+4)*12);
-  });
-  return (<>
-    <ambientLight intensity={0.6} color={0x001122} />
-    <pointLight ref={k} color={0x00aaff} intensity={18} distance={140} />
-    <pointLight ref={f} color={0x0022cc} intensity={10} distance={100} />
-    <pointLight ref={r} color={0x00ffcc} intensity={6} distance={70} />
-  </>);
-}
-
-/* ──────────── FX ──────────── */
+/* ═══════════════════════════════════════
+   8. POSTPROCESSING FX
+   ═══════════════════════════════════════ */
 function FX() {
   return (
     <EffectComposer>
       <Bloom luminanceThreshold={0.15} luminanceSmoothing={0.7} intensity={1.6} radius={0.85} />
-      <Vignette offset={0.3} darkness={0.75} />
+      <Vignette eskil={false} offset={0.25} darkness={0.65} />
     </EffectComposer>
   );
 }
 
-/* ══════════════════════════════════════════════════════════
-   GLASS STYLE
-══════════════════════════════════════════════════════════ */
-const glass = {
-  background: "rgba(0,8,28,0.6)",
-  backdropFilter: "blur(20px)",
-  WebkitBackdropFilter: "blur(20px)",
-  border: "1px solid rgba(0,180,255,0.2)",
-  borderRadius: "16px",
-  padding: "28px",
-  color: "#c0f0ff",
-};
-
-/* ══════════════════════════════════════════════════════════
-   DETAIL PANEL — slides in from right when orb is clicked
-══════════════════════════════════════════════════════════ */
+/* ═══════════════════════════════════════
+   9. DETAIL PANEL (Skill info on click)
+   ═══════════════════════════════════════ */
 function DetailPanel({ skill, onClose }) {
+  if (!skill) return null;
   return (
-    <div style={{
-      position: "fixed",
-      right: skill ? 20 : -400,
-      top: "50%",
-      transform: "translateY(-50%)",
-      width: 320,
-      zIndex: 100,
-      pointerEvents: skill ? "auto" : "none",
-      transition: "right 0.45s cubic-bezier(0.23,1,0.32,1)",
-      ...glass,
-      padding: "30px 26px",
-      boxShadow: "0 0 60px rgba(0,100,255,0.3), 0 0 120px rgba(0,60,180,0.15)",
-      border: `1px solid ${skill ? skill.color + "55" : "rgba(0,180,255,0.2)"}`,
-    }}>
-      {skill && (<>
-        <div style={{ fontSize: 11, letterSpacing: ".35em", color: "#006688", marginBottom: 18, textTransform: "uppercase" }}>
-          ◈ SKILL SEQUENCE
-        </div>
-        <div style={{
-          fontSize: 26, fontWeight: 900, color: skill.color, marginBottom: 10,
-          textShadow: `0 0 20px ${skill.color}`,
-          letterSpacing: ".08em",
-        }}>
-          {skill.name}
-        </div>
-        <p style={{ fontSize: 13, color: "#90c4d8", lineHeight: 1.75, marginBottom: 22 }}>
-          {skill.desc}
-        </p>
-        <div style={{ fontSize: 11, color: "#446688", letterSpacing: ".2em", marginBottom: 8 }}>PROFICIENCY LEVEL</div>
-        <div style={{ background: "rgba(0,20,50,0.7)", borderRadius: 8, height: 10, marginBottom: 8, overflow: "hidden", border: "1px solid rgba(0,100,160,0.3)" }}>
-          <div style={{
-            width: skill.pct + "%", height: "100%", borderRadius: 8,
-            background: `linear-gradient(90deg, #0066ff, ${skill.color})`,
-            boxShadow: `0 0 16px ${skill.color}, 0 0 30px ${skill.color}55`,
-            transition: "width 0.9s ease",
-          }} />
-        </div>
-        <div style={{ fontSize: 22, fontWeight: 800, color: skill.color, marginBottom: 24, textAlign: "right" }}>
-          {skill.pct}%
-        </div>
+    <div
+      style={{
+        position: "fixed", top: "50%", right: 40, transform: "translateY(-50%)",
+        zIndex: 100, background: "rgba(0,8,28,0.88)", backdropFilter: "blur(24px)",
+        border: "1px solid rgba(0,220,255,0.25)", borderRadius: 18, padding: "28px 36px",
+        maxWidth: 340, color: "#c0f8ff", fontFamily: "'Segoe UI',sans-serif",
+        pointerEvents: "auto",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <h3 style={{ margin: 0, fontSize: 20, color: skill.color, letterSpacing: ".12em" }}>{skill.name}</h3>
         <button
           onClick={onClose}
-          style={{
-            width: "100%", padding: "10px 0", background: "transparent",
-            border: `1px solid ${skill.color}88`, borderRadius: 8,
-            color: skill.color, fontSize: 12, letterSpacing: ".25em",
-            cursor: "pointer", transition: "all .25s", textTransform: "uppercase",
-          }}
-          onMouseEnter={e => { e.currentTarget.style.background = skill.color + "22"; e.currentTarget.style.boxShadow = `0 0 18px ${skill.color}44`; }}
-          onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.boxShadow = "none"; }}
-        >
-          ✕  Close
-        </button>
-      </>)}
+          style={{ background: "none", border: "none", color: "#00ccff", fontSize: 22, cursor: "pointer" }}
+        >\u2715</button>
+      </div>
+      <div style={{
+        margin: "14px 0", height: 6, borderRadius: 3, background: "rgba(0,200,255,0.1)",
+        overflow: "hidden",
+      }}>
+        <div style={{
+          width: `${skill.pct}%`, height: "100%", borderRadius: 3,
+          background: `linear-gradient(90deg,${skill.color},#00ffee)`,
+          boxShadow: `0 0 12px ${skill.color}`,
+        }} />
+      </div>
+      <span style={{ fontSize: 12, color: "#55aacc" }}>{skill.pct}% proficiency</span>
+      <p style={{ marginTop: 14, fontSize: 13, lineHeight: 1.7, color: "#88ccdd" }}>{skill.desc}</p>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════
-   HTML OVERLAY
-══════════════════════════════════════════════════════════ */
-function Overlay() {
+/* ═══════════════════════════════════════
+   10. CONTACT CARD (modal)
+   ═══════════════════════════════════════ */
+function ContactCard({ onClose }) {
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.55)",
+        backdropFilter: "blur(4px)", display: "flex", alignItems: "center", justifyContent: "center",
+        pointerEvents: "auto",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          background: "rgba(0,8,28,0.92)", backdropFilter: "blur(24px)",
+          border: "1px solid rgba(0,220,255,0.35)", borderRadius: 20,
+          padding: "36px 48px", textAlign: "center", color: "#c0f8ff",
+          fontFamily: "Segoe UI,sans-serif", minWidth: 280,
+        }}
+      >
+        <div style={{ fontSize: 11, letterSpacing: ".25em", color: "#007799", marginBottom: 6 }}>GET IN TOUCH</div>
+        <h2 style={{ margin: "0 0 24px", fontSize: 22, letterSpacing: ".2em", color: "#00ffee", textShadow: "0 0 18px #00ffe0" }}>
+          AANAND KUMAR
+        </h2>
+        <a
+          href={`https://github.com/${PERSONAL.github}`} target="_blank" rel="noopener noreferrer"
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            color: "#00eeff", textDecoration: "none", fontSize: 15, margin: "0 0 14px",
+            padding: "10px 20px", border: "1px solid rgba(0,200,255,0.25)", borderRadius: 10,
+          }}
+        >
+          \u2B21 GitHub: {PERSONAL.github}
+        </a>
+        <a
+          href={`mailto:${PERSONAL.email}`}
+          style={{
+            display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
+            color: "#00eeff", textDecoration: "none", fontSize: 13,
+            padding: "10px 20px", border: "1px solid rgba(0,200,255,0.25)", borderRadius: 10,
+          }}
+        >
+          \u2709 {PERSONAL.email}
+        </a>
+        <button
+          onClick={onClose}
+          style={{
+            marginTop: 24, padding: "8px 32px", border: "1px solid rgba(0,170,255,0.5)",
+            borderRadius: 8, background: "transparent", color: "#00ccff",
+            cursor: "pointer", fontSize: 12, letterSpacing: ".15em",
+          }}
+        >CLOSE</button>
+      </div>
+    </div>
+  );
+}
+
+/* ═══════════════════════════════════════
+   11. HTML OVERLAY (pointer-events: none)
+   ═══════════════════════════════════════ */
+function Overlay({ onContactOpen }) {
   return (
     <div style={{
-      position: "fixed", inset: 0, zIndex: 10, pointerEvents: "none",
-      overflowY: "auto", fontFamily: "'Segoe UI', system-ui, sans-serif",
+      position: "absolute", inset: 0, zIndex: 10,
+      pointerEvents: "none", fontFamily: "'Segoe UI',sans-serif", color: "#c0f8ff",
     }}>
-
-      {/* ── HERO: fixed LEFT panel ── */}
+      {/* ── LEFT HERO PANEL ── */}
       <div style={{
-        position: "fixed", left: 0, top: 0, bottom: 0, width: "clamp(155px,17vw,230px)",
+        position: "fixed", left: 0, top: 0, bottom: 0, width: 340,
         display: "flex", flexDirection: "column", justifyContent: "center",
-        padding: "0 0 0 20px", zIndex: 12, pointerEvents: "none",
+        padding: "0 32px", pointerEvents: "none",
+        background: "linear-gradient(90deg,rgba(0,2,10,0.85) 60%,transparent)",
       }}>
-        <div style={{
-          background: "rgba(0,3,14,0.6)", backdropFilter: "blur(16px)", WebkitBackdropFilter: "blur(16px)",
-          border: "1px solid rgba(0,160,230,0.2)", borderRadius: "14px",
-          padding: "16px 18px 14px", marginBottom: 14,
+        <div style={{ fontSize: 10, letterSpacing: ".3em", color: "#007799", marginBottom: 4 }}>PORTFOLIO</div>
+        <h1 style={{
+          fontSize: 28, margin: "0 0 6px", letterSpacing: ".25em", color: "#00ffee",
+          textShadow: "0 0 18px #00ffe0,0 0 60px #0088ff",
+          animation: "tpulse 3s ease-in-out infinite",
         }}>
-          <h1 style={{
-            fontSize: "clamp(15px,2vw,26px)", fontWeight: 900, letterSpacing: ".16em", color: "#a0f8ff",
-            textShadow: "0 0 14px #00ffff, 0 0 40px #00ccff, 0 0 80px #0088ff",
-            animation: "tpulse 3s ease-in-out infinite", margin: "0 0 9px", lineHeight: 1.2,
-          }}>
-            {PERSONAL.name.split(" ").map((w,i) => <span key={i} style={{display:"block"}}>{w}</span>)}
-          </h1>
-          <p style={{ fontSize: "clamp(7px,0.7vw,10px)", letterSpacing: ".15em", color: "#00aacc", margin: 0, lineHeight: 1.7 }}>
-            {PERSONAL.role.split("|").map((p,i) => <span key={i} style={{display:"block"}}>{p.trim()}</span>)}
-          </p>
-        </div>
-        <div style={{ fontSize: 8.5, color: "#1e3d50", letterSpacing: ".13em", lineHeight: 2.4 }}>
-          <div style={{color:"#1e4a5a"}}>⟳ DRAG — ROTATE DNA</div>
-          <div style={{color:"#1e4a5a"}}>↕ SCROLL — SPIN DNA</div>
-          <div style={{color:"#1e4a5a"}}>● CLICK ORBS — EXPLORE</div>
-        </div>
-        <div style={{ marginTop: 24, fontSize: 9, color: "#1a3344", letterSpacing: ".22em", animation: "bounce 2.2s infinite" }}>
-          ▼ SCROLL DOWN
+          {PERSONAL.name}
+        </h1>
+        <p style={{ margin: "0 0 10px", fontSize: 11, letterSpacing: ".15em", color: "#55aacc" }}>{PERSONAL.role}</p>
+        <p style={{ fontSize: 11, lineHeight: 1.6, color: "#448899", maxWidth: 280 }}>{PERSONAL.bio}</p>
+        <div style={{ marginTop: 20, fontSize: 10, color: "#335566", letterSpacing: ".15em" }}>
+          \u2193 SCROLL TO EXPLORE \u2193
         </div>
       </div>
-      {/* invisible spacer so scroll content still starts below fold */}
-      <section style={{ height: "100vh", pointerEvents: "none" }} />
 
-      {/* ── ABOUT ── */}
-      <section style={{ maxWidth: 740, margin: "0 auto", padding: "80px 20px 40px", pointerEvents: "auto" }}>
-        <div style={glass}>
-          <h2 style={{ color: "#00ccff", fontSize: 13, letterSpacing: ".35em", marginBottom: 20, textTransform: "uppercase" }}>
-            ◈  About Me
-          </h2>
-          <p style={{ fontSize: 15, lineHeight: 1.9, color: "#a0d8ee", marginBottom: 16 }}>{PERSONAL.bio}</p>
-          <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 8 }}>
-            {[
-              { label: "Degree", val: PERSONAL.college },
-              { label: "Location", val: PERSONAL.location },
-              { label: "Email", val: PERSONAL.email },
-            ].map(item => (
-              <div key={item.label} style={{ background: "rgba(0,30,70,0.5)", borderRadius: 8, padding: "8px 16px", border: "1px solid rgba(0,120,200,0.2)", fontSize: 12 }}>
-                <span style={{ color: "#446688", letterSpacing: ".12em", display: "block", marginBottom: 3 }}>{item.label.toUpperCase()}</span>
-                <span style={{ color: "#80d0ee" }}>{item.val}</span>
-              </div>
-            ))}
+      {/* ── SCROLLABLE CONTENT (right side) ── */}
+      <div style={{
+        position: "absolute", top: 0, right: 0, bottom: 0,
+        width: "calc(100% - 360px)", overflowY: "auto",
+        pointerEvents: "auto", padding: "100vh 40px 60px 20px",
+      }}>
+        {/* ABOUT */}
+        <section style={{ marginBottom: 80 }}>
+          <h2 style={sectionTitle}>\u25C8 ABOUT ME</h2>
+          <div style={glassCard}>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.8, color: "#88ccdd" }}>{PERSONAL.bio}</p>
+            <p style={{ marginTop: 12, fontSize: 13, color: "#55aacc" }}>
+              \uD83C\uDF93 B.Tech Computer Science Engineering \u2014 3rd Year<br />
+              \uD83D\uDCCD India
+            </p>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── SKILLS ── */}
-      <section style={{ maxWidth: 740, margin: "0 auto", padding: "40px 20px", pointerEvents: "auto" }}>
-        <div style={glass}>
-          <h2 style={{ color: "#00ccff", fontSize: 13, letterSpacing: ".35em", marginBottom: 24, textTransform: "uppercase" }}>
-            ◈  Core Skills  &nbsp;<span style={{ color: "#335566", fontSize: 11, letterSpacing: ".2em" }}>(click orbs in 3D for details)</span>
-          </h2>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px 24px" }}>
+        {/* SKILLS */}
+        <section style={{ marginBottom: 80 }}>
+          <h2 style={sectionTitle}>\u25C8 SKILLS</h2>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 16 }}>
             {SKILLS.map((sk) => (
-              <div key={sk.name}>
-                <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12, marginBottom: 5, color: sk.color, letterSpacing: ".1em" }}>
-                  <span style={{ fontWeight: 600 }}>{sk.name}</span>
-                  <span style={{ color: "#669" }}>{sk.pct}%</span>
+              <div key={sk.name} style={glassCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                  <span style={{ color: sk.color, fontSize: 14, letterSpacing: ".08em" }}>{sk.name}</span>
+                  <span style={{ color: "#447788", fontSize: 12 }}>{sk.pct}%</span>
                 </div>
-                <div style={{ background: "rgba(0,20,50,0.6)", borderRadius: 6, height: 6, overflow: "hidden" }}>
+                <div style={{ height: 4, borderRadius: 2, background: "rgba(0,200,255,0.08)" }}>
                   <div style={{
-                    width: sk.pct + "%", height: "100%", borderRadius: 6,
-                    background: `linear-gradient(90deg, #0055bb, ${sk.color})`,
+                    width: `${sk.pct}%`, height: "100%", borderRadius: 2,
+                    background: `linear-gradient(90deg,${sk.color},#00ffee)`,
                     boxShadow: `0 0 8px ${sk.color}`,
                   }} />
                 </div>
               </div>
             ))}
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* ── PROJECTS ── */}
-      <section style={{ maxWidth: 960, margin: "0 auto", padding: "40px 20px 80px", pointerEvents: "auto" }}>
-        <h2 style={{ color: "#00ccff", fontSize: 13, letterSpacing: ".35em", textTransform: "uppercase", textAlign: "center", marginBottom: 36, textShadow: "0 0 14px #004477" }}>
-          ◈  Projects
-        </h2>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 24 }}>
-          {PROJECTS.map((p) => (
-            <div key={p.title} style={{
-              ...glass, padding: "24px",
-              transition: "transform .3s, box-shadow .3s",
-              cursor: "default",
-            }}
-              onMouseEnter={e => { e.currentTarget.style.transform = "translateY(-4px)"; e.currentTarget.style.boxShadow = "0 12px 40px rgba(0,100,200,0.25)"; }}
-              onMouseLeave={e => { e.currentTarget.style.transform = "none"; e.currentTarget.style.boxShadow = "none"; }}
-            >
-              <div style={{ fontSize: 28, marginBottom: 10 }}>{p.icon}</div>
-              <h3 style={{ fontSize: 16, fontWeight: 700, color: "#80f0ff", marginBottom: 10, letterSpacing: ".04em" }}>{p.title}</h3>
-              <p style={{ fontSize: 13, color: "#8abbcc", lineHeight: 1.75, marginBottom: 14 }}>{p.desc}</p>
-              <div style={{ marginBottom: 18, display: "flex", flexWrap: "wrap", gap: 6 }}>
-                {p.tech.map((t) => (
-                  <span key={t} style={{
-                    background: "rgba(0,30,70,0.7)", border: "1px solid rgba(0,100,180,0.35)",
-                    borderRadius: 4, padding: "3px 10px", fontSize: 11, color: "#00bbdd", letterSpacing: ".06em",
-                  }}>{t}</span>
-                ))}
+        {/* PROJECTS */}
+        <section style={{ marginBottom: 80 }}>
+          <h2 style={sectionTitle}>\u25C8 PROJECTS</h2>
+          <div style={{ display: "grid", gap: 20 }}>
+            {PROJECTS.map((p) => (
+              <div key={p.title} style={glassCard}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <h3 style={{ margin: 0, fontSize: 16, color: "#00eeff" }}>
+                    {p.icon} {p.title}
+                  </h3>
+                  <a
+                    href={p.url} target="_blank" rel="noopener noreferrer"
+                    style={{
+                      fontSize: 11, color: "#00ccff", textDecoration: "none",
+                      border: "1px solid rgba(0,200,255,0.3)", padding: "4px 14px",
+                      borderRadius: 6, pointerEvents: "auto",
+                    }}
+                  >GitHub \u2197</a>
+                </div>
+                <div style={{ margin: "10px 0 8px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                  {p.tech.map((t) => (
+                    <span key={t} style={{
+                      fontSize: 10, padding: "2px 8px", borderRadius: 4,
+                      background: "rgba(0,200,255,0.08)", color: "#55bbcc", letterSpacing: ".04em",
+                    }}>{t}</span>
+                  ))}
+                </div>
+                <p style={{ margin: 0, fontSize: 12.5, lineHeight: 1.7, color: "#6699aa" }}>{p.desc}</p>
               </div>
-              <a href={p.url} target="_blank" rel="noopener noreferrer"
-                style={{
-                  display: "inline-flex", alignItems: "center", gap: 6,
-                  padding: "9px 20px", border: "1px solid #0088cc",
-                  borderRadius: 7, color: "#00ddff", fontSize: 12, letterSpacing: ".15em",
-                  textDecoration: "none", background: "rgba(0,40,80,0.4)", transition: "all .25s",
-                }}
-                onMouseEnter={e => { e.currentTarget.style.background = "#001840"; e.currentTarget.style.boxShadow = "0 0 20px #0066cc"; e.currentTarget.style.borderColor = "#00ccff"; }}
-                onMouseLeave={e => { e.currentTarget.style.background = "rgba(0,40,80,0.4)"; e.currentTarget.style.boxShadow = "none"; e.currentTarget.style.borderColor = "#0088cc"; }}
-              >
-                ⬡ VIEW ON GITHUB →
-              </a>
-            </div>
-          ))}
-        </div>
-      </section>
+            ))}
+          </div>
+        </section>
 
-      {/* ── CONTACT ── */}
-      <footer style={{ textAlign: "center", padding: "60px 20px 50px", pointerEvents: "auto" }}>
-        <div style={{ ...glass, display: "inline-block", padding: "30px 60px", maxWidth: 480 }}>
-          <h2 style={{ color: "#00ccff", fontSize: 13, letterSpacing: ".35em", textTransform: "uppercase", marginBottom: 22 }}>
-            ◈  Get In Touch
-          </h2>
-          <div style={{ fontSize: 14, color: "#88ccdd", lineHeight: 2.6 }}>
-            <div>
-              <a href={"https://github.com/" + PERSONAL.github} target="_blank" rel="noopener noreferrer"
-                style={{ color: "#00eeff", textDecoration: "none", letterSpacing: ".06em" }}>
-                ⬡ &nbsp;github.com/{PERSONAL.github}
-              </a>
-            </div>
-            <div>
-              <a href={"mailto:" + PERSONAL.email}
-                style={{ color: "#00eeff", textDecoration: "none", letterSpacing: ".04em" }}>
-                ✉ &nbsp;{PERSONAL.email}
-              </a>
-            </div>
-            <div style={{ color: "#446688", fontSize: 12 }}>
-              📍 &nbsp;{PERSONAL.location}
+        {/* CONTACT */}
+        <section style={{ marginBottom: 60 }}>
+          <h2 style={sectionTitle}>\u25C8 CONTACT</h2>
+          <div style={{ ...glassCard, textAlign: "center" }}>
+            <p style={{ margin: "0 0 16px", fontSize: 14, color: "#88ccdd" }}>Let's connect and build something amazing.</p>
+            <div style={{ display: "flex", gap: 12, justifyContent: "center", flexWrap: "wrap" }}>
+              <a href={`https://github.com/${PERSONAL.github}`} target="_blank" rel="noopener noreferrer"
+                style={linkBtn}>\u2B21 GitHub</a>
+              <button onClick={onContactOpen} style={{ ...linkBtn, cursor: "pointer", background: "rgba(0,200,255,0.08)" }}>
+                \u2709 Email Me
+              </button>
             </div>
           </div>
-        </div>
-        <p style={{ marginTop: 36, fontSize: 11, color: "#1a3344", letterSpacing: ".25em" }}>
-          © 2026 Aanand Kumar · Built with React Three Fiber
-        </p>
-      </footer>
+        </section>
+      </div>
     </div>
   );
 }
 
-/* ══════════════════════════════════════════════════════════
-   ROOT APP
-══════════════════════════════════════════════════════════ */
+/* ── shared styles ── */
+const sectionTitle = {
+  fontSize: 14, letterSpacing: ".25em", color: "#00bbdd",
+  marginBottom: 20, textShadow: "0 0 14px #0088aa",
+};
+const glassCard = {
+  background: "rgba(0,12,30,0.55)", backdropFilter: "blur(16px)",
+  border: "1px solid rgba(0,200,255,0.12)", borderRadius: 14, padding: "20px 24px",
+};
+const linkBtn = {
+  fontSize: 12, color: "#00ccff", textDecoration: "none",
+  border: "1px solid rgba(0,200,255,0.3)", padding: "8px 20px",
+  borderRadius: 8, pointerEvents: "auto", background: "transparent",
+};
+
+/* ═══════════════════════════════════════
+   12. AI HAND TRACKING (MediaPipe)
+   ═══════════════════════════════════════ */
+function useHandTracking(handRef, enabled) {
+  const videoRef = useRef(null);
+  const cameraRef = useRef(null);
+
+  useEffect(() => {
+    if (!enabled) {
+      if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
+      if (videoRef.current) { videoRef.current.srcObject = null; }
+      handRef.current = { active: false, x: 0.5, pinch: 1 };
+      return;
+    }
+
+    let cancelled = false;
+
+    async function init() {
+      try {
+        const { Hands } = await import("@mediapipe/hands");
+        const { Camera } = await import("@mediapipe/camera_utils");
+
+        const video = document.createElement("video");
+        video.setAttribute("playsinline", "");
+        video.style.display = "none";
+        document.body.appendChild(video);
+        videoRef.current = video;
+
+        const hands = new Hands({
+          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+        });
+        hands.setOptions({
+          maxNumHands: 1,
+          modelComplexity: 0,
+          minDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
+        });
+        hands.onResults((results) => {
+          if (cancelled) return;
+          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
+            const lm = results.multiHandLandmarks[0];
+            const wrist = lm[0];
+            const thumb = lm[4];
+            const index = lm[8];
+            const dx = thumb.x - index.x;
+            const dy = thumb.y - index.y;
+            const pinchDist = Math.sqrt(dx * dx + dy * dy);
+            handRef.current = { active: true, x: wrist.x, pinch: pinchDist };
+          } else {
+            handRef.current = { ...handRef.current, active: false };
+          }
+        });
+
+        const cam = new Camera(video, {
+          onFrame: async () => { await hands.send({ image: video }); },
+          width: 320, height: 240,
+        });
+        cameraRef.current = cam;
+        cam.start();
+      } catch (err) {
+        console.warn("Hand tracking init failed:", err);
+        handRef.current = { active: false, x: 0.5, pinch: 1 };
+      }
+    }
+
+    init();
+    return () => {
+      cancelled = true;
+      if (cameraRef.current) { cameraRef.current.stop(); cameraRef.current = null; }
+      if (videoRef.current) {
+        videoRef.current.srcObject = null;
+        videoRef.current.remove();
+        videoRef.current = null;
+      }
+    };
+  }, [enabled, handRef]);
+}
+
+/* ═══════════════════════════════════════
+   13. MAIN APP
+   ═══════════════════════════════════════ */
 export default function App() {
   const [activeSkill, setActiveSkill] = useState(null);
   const [contactCard, setContactCard] = useState(false);
+  const [handEnabled, setHandEnabled] = useState(false);
+
   const handleNodeClick = useCallback((sk) => {
-    if (sk && sk.isContact) { setContactCard(c => !c); return; }
-    setActiveSkill(prev => prev?.name === sk.name ? null : sk);
+    setActiveSkill((prev) => (prev?.name === sk.name ? null : sk));
   }, []);
   const handleClose = useCallback(() => setActiveSkill(null), []);
 
-  // Drag + scroll rotation state
+  /* drag + scroll rotation */
   const rotRef = useRef({ dy: 0, dx: 0, scroll: 0, dragging: false });
   const dragRef = useRef({ active: false, lastX: 0, lastY: 0 });
+  const handRef = useRef({ active: false, x: 0.5, pinch: 1 });
+
+  useHandTracking(handRef, handEnabled);
 
   const onPointerDown = useCallback((e) => {
-    dragRef.current.active = true;
-    dragRef.current.lastX = e.clientX;
-    dragRef.current.lastY = e.clientY;
+    dragRef.current = { active: true, lastX: e.clientX, lastY: e.clientY };
     rotRef.current.dragging = true;
   }, []);
 
   const onPointerMove = useCallback((e) => {
     if (!dragRef.current.active) return;
-    const dx = e.clientX - dragRef.current.lastX;
-    const dy = e.clientY - dragRef.current.lastY;
-    rotRef.current.dy += dx * 0.55;
-    rotRef.current.dx += dy * 0.55;
+    rotRef.current.dy += (e.clientX - dragRef.current.lastX) * 0.55;
+    rotRef.current.dx += (e.clientY - dragRef.current.lastY) * 0.55;
     dragRef.current.lastX = e.clientX;
     dragRef.current.lastY = e.clientY;
   }, []);
 
-  const onPointerUp = useCallback(() => { dragRef.current.active = false; rotRef.current.dragging = false; }, []);
+  const onPointerUp = useCallback(() => {
+    dragRef.current.active = false;
+    rotRef.current.dragging = false;
+  }, []);
 
   const onWheel = useCallback((e) => {
     rotRef.current.scroll += e.deltaY > 0 ? 2.5 : -2.5;
   }, []);
 
-  return (<>
-    <style>{`
-      @keyframes tpulse {
-        0%,100% { text-shadow:0 0 14px #00ffff,0 0 40px #00ccff,0 0 80px #0088ff,0 0 140px #0044cc; filter:brightness(1.3); }
-        50% { text-shadow:0 0 28px #fff,0 0 65px #00ffff,0 0 120px #00aaff,0 0 200px #0077ee; filter:brightness(1.8); }
-      }
-      @keyframes bounce {
-        0%,100% { transform:translateY(0); opacity:.4; }
-        50% { transform:translateY(7px); opacity:.9; }
-      }
-      html,body,#root { margin:0; padding:0; width:100%; height:100%; background:#00020a; overflow-x:hidden; }
-      ::-webkit-scrollbar { width:4px; }
-      ::-webkit-scrollbar-track { background:#000a14; }
-      ::-webkit-scrollbar-thumb { background:#002244; border-radius:4px; }
-      * { box-sizing:border-box; }
-    `}</style>
+  return (
+    <>
+      <style>{`
+        @keyframes tpulse {
+          0%,100% { text-shadow:0 0 14px #00ffff,0 0 40px #00ccff,0 0 80px #0088ff; filter:brightness(1.3); }
+          50% { text-shadow:0 0 28px #fff,0 0 65px #00ffff,0 0 120px #00aaff; filter:brightness(1.8); }
+        }
+        html,body,#root { margin:0; padding:0; width:100%; height:100%; background:${BG}; overflow-x:hidden; }
+        ::-webkit-scrollbar { width:4px; }
+        ::-webkit-scrollbar-track { background:#000a14; }
+        ::-webkit-scrollbar-thumb { background:#002244; border-radius:4px; }
+        * { box-sizing:border-box; }
+      `}</style>
 
-    <Canvas
-      gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
-      camera={{ position: [0, 0, 38], fov: 58 }}
-      style={{ position: "fixed", inset: 0, zIndex: 0, cursor: dragRef.current.active ? "grabbing" : "grab" }}
-      onPointerMissed={() => setActiveSkill(null)}
-      onPointerDown={onPointerDown}
-      onPointerMove={onPointerMove}
-      onPointerUp={onPointerUp}
-      onPointerLeave={onPointerUp}
-      onWheel={onWheel}
-    >
-      <fog attach="fog" args={[BG, 35, 110]} />
-      <color attach="background" args={[BG]} />
-      <Lights />
-      <DNAHelix onNodeClick={handleNodeClick} rotRef={rotRef} onContactClick={() => setContactCard(true)} />
-      <MatrixRain />
-      <SparkleSwarm />
-      <FX />
-    </Canvas>
+      <Canvas
+        gl={{ antialias: true, toneMapping: THREE.ACESFilmicToneMapping, toneMappingExposure: 1.2 }}
+        camera={{ position: [0, 0, 38], fov: 58 }}
+        style={{ position: "fixed", inset: 0, zIndex: 0, cursor: dragRef.current.active ? "grabbing" : "grab" }}
+        onPointerMissed={() => setActiveSkill(null)}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerLeave={onPointerUp}
+        onWheel={onWheel}
+      >
+        <fog attach="fog" args={[BG, 35, 110]} />
+        <color attach="background" args={[BG]} />
+        <Lights />
+        <DNAHelix onNodeClick={handleNodeClick} rotRef={rotRef} handRef={handRef} />
+        <MatrixRain />
+        <ParticleSystem handRef={handRef} />
+        <SparkleSwarm />
+        <FX />
+      </Canvas>
 
-    <Overlay />
-    <DetailPanel skill={activeSkill} onClose={handleClose} />
-    {contactCard && (
-      <div onClick={() => setContactCard(false)} style={{ position:"fixed", inset:0, zIndex:200, background:"rgba(0,0,0,0.55)", backdropFilter:"blur(4px)", display:"flex", alignItems:"center", justifyContent:"center" }}>
-        <div onClick={e => e.stopPropagation()} style={{ background:"rgba(0,8,28,0.92)", backdropFilter:"blur(24px)", border:"1px solid rgba(0,220,255,0.35)", borderRadius:20, padding:"36px 48px", textAlign:"center", color:"#c0f8ff", fontFamily:"Segoe UI,sans-serif", minWidth:280 }}>
-          <div style={{ fontSize:11, letterSpacing:".25em", color:"#007799", marginBottom:6 }}>GET IN TOUCH</div>
-          <h2 style={{ margin:"0 0 24px", fontSize:22, letterSpacing:".2em", color:"#00ffee", textShadow:"0 0 18px #00ffe0" }}>AANAND KUMAR</h2>
-          <a href="https://github.com/Aanand251" target="_blank" rel="noopener noreferrer" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, color:"#00eeff", textDecoration:"none", fontSize:15, margin:"0 0 14px", padding:"10px 20px", border:"1px solid rgba(0,200,255,0.25)", borderRadius:10, transition:"all .2s" }} onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,200,255,0.1)";e.currentTarget.style.borderColor="rgba(0,200,255,0.6)"}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="rgba(0,200,255,0.25)"}}>
-            <span style={{ fontSize:18 }}>⬡</span> GitHub: Aanand251
-          </a>
-          <a href="mailto:choudharyaanandkumar251@gmail.com" style={{ display:"flex", alignItems:"center", justifyContent:"center", gap:8, color:"#00eeff", textDecoration:"none", fontSize:13, padding:"10px 20px", border:"1px solid rgba(0,200,255,0.25)", borderRadius:10, transition:"all .2s" }} onMouseEnter={e=>{e.currentTarget.style.background="rgba(0,200,255,0.1)";e.currentTarget.style.borderColor="rgba(0,200,255,0.6)"}} onMouseLeave={e=>{e.currentTarget.style.background="transparent";e.currentTarget.style.borderColor="rgba(0,200,255,0.25)"}}>
-            <span style={{ fontSize:16 }}>✉</span> choudharyaanandkumar251@gmail.com
-          </a>
-          <button onClick={() => setContactCard(false)} style={{ marginTop:24, padding:"8px 32px", border:"1px solid rgba(0,170,255,0.5)", borderRadius:8, background:"transparent", color:"#00ccff", cursor:"pointer", fontSize:12, letterSpacing:".15em" }}>CLOSE</button>
+      <Overlay onContactOpen={() => setContactCard(true)} />
+      <DetailPanel skill={activeSkill} onClose={handleClose} />
+      {contactCard && <ContactCard onClose={() => setContactCard(false)} />}
+
+      {/* JARVIS TOGGLE BUTTON */}
+      <button
+        onClick={() => setHandEnabled((p) => !p)}
+        style={{
+          position: "fixed", bottom: 24, right: 24, zIndex: 300,
+          padding: "10px 22px", borderRadius: 12,
+          background: handEnabled ? "rgba(0,255,200,0.15)" : "rgba(0,120,200,0.12)",
+          border: `1px solid ${handEnabled ? "#00ffc8" : "rgba(0,200,255,0.3)"}`,
+          color: handEnabled ? "#00ffc8" : "#00ccff",
+          fontSize: 12, letterSpacing: ".1em", cursor: "pointer",
+          fontFamily: "'Segoe UI',sans-serif",
+          backdropFilter: "blur(12px)",
+          boxShadow: handEnabled ? "0 0 20px rgba(0,255,200,0.3)" : "none",
+        }}
+      >
+        {handEnabled ? "\u{1F916} J.A.R.V.I.S ACTIVE" : "\u{1F4F7} Enable Camera / J.A.R.V.I.S"}
+      </button>
+
+      {/* hand tracking status indicator */}
+      {handEnabled && (
+        <div style={{
+          position: "fixed", bottom: 60, right: 24, zIndex: 300,
+          fontSize: 10, color: "#00aa88", letterSpacing: ".1em",
+          fontFamily: "'Segoe UI',sans-serif",
+        }}>
+          {handRef.current?.active ? "\u{1F7E2} Hand Detected — Pinch to converge particles" : "\u{1F534} Waiting for hand..."}
         </div>
-      </div>
-    )}
-  </>);
+      )}
+    </>
+  );
 }
