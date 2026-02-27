@@ -678,16 +678,16 @@ const linkBtn = {
 function useHandTracking(handRef, enabled) {
   const videoRef = useRef(null);
   const streamRef = useRef(null);
-  const handsRef = useRef(null);
   const rafRef = useRef(null);
+  const landmarkerRef = useRef(null);
 
   useEffect(() => {
+    /* === CLEANUP when disabled === */
     if (!enabled) {
-      /* cleanup */
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
       if (videoRef.current) { videoRef.current.srcObject = null; videoRef.current.remove(); videoRef.current = null; }
-      if (handsRef.current) { handsRef.current.close(); handsRef.current = null; }
+      if (landmarkerRef.current) { landmarkerRef.current.close(); landmarkerRef.current = null; }
       handRef.current = { active: false, x: 0.5, pinch: 1 };
       return;
     }
@@ -696,88 +696,121 @@ function useHandTracking(handRef, enabled) {
 
     async function init() {
       try {
-        /* 1. Import MediaPipe */
-        const handsModule = await import("@mediapipe/hands");
-        const Hands = handsModule.Hands;
+        /* 1. Import the modern MediaPipe Tasks Vision (npm package — works with Vite) */
+        const vision = await import("@mediapipe/tasks-vision");
+        const { HandLandmarker, FilesetResolver } = vision;
 
-        /* 2. Create hidden video element */
+        if (cancelled) return;
+
+        /* 2. Load WASM runtime from CDN */
+        const wasmFileset = await FilesetResolver.forVisionTasks(
+          "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@latest/wasm"
+        );
+
+        if (cancelled) return;
+
+        /* 3. Create HandLandmarker */
+        const landmarker = await HandLandmarker.createFromOptions(wasmFileset, {
+          baseOptions: {
+            modelAssetPath: "https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task",
+            delegate: "GPU",
+          },
+          runningMode: "VIDEO",
+          numHands: 1,
+          minHandDetectionConfidence: 0.5,
+          minHandPresenceConfidence: 0.5,
+          minTrackingConfidence: 0.5,
+        });
+        landmarkerRef.current = landmarker;
+
+        if (cancelled) { landmarker.close(); return; }
+
+        /* 4. Create video + get webcam */
         const video = document.createElement("video");
         video.setAttribute("playsinline", "");
         video.setAttribute("autoplay", "");
-        video.setAttribute("muted", "");
         video.muted = true;
-        video.style.cssText = "position:fixed;bottom:12px;left:12px;width:160px;height:120px;z-index:9999;border-radius:10px;border:1px solid #00ffaa44;opacity:0.7;transform:scaleX(-1);";
+        video.style.cssText = "position:fixed;bottom:12px;left:12px;width:180px;height:135px;z-index:9999;border-radius:12px;border:2px solid rgba(0,255,170,0.4);opacity:0.75;transform:scaleX(-1);object-fit:cover;pointer-events:none;";
         document.body.appendChild(video);
         videoRef.current = video;
 
-        /* 3. Get webcam stream manually (most reliable) */
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { width: 320, height: 240, facingMode: "user" } });
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: "user" },
+        });
+        if (cancelled) { stream.getTracks().forEach(t => t.stop()); return; }
         streamRef.current = stream;
         video.srcObject = stream;
         await video.play();
 
+        /* wait until video actually has frames */
+        await new Promise((res) => {
+          const check = () => {
+            if (video.readyState >= 2 && video.videoWidth > 0) res();
+            else setTimeout(check, 100);
+          };
+          check();
+        });
         if (cancelled) return;
 
-        /* 4. Initialize MediaPipe Hands */
-        const hands = new Hands({
-          locateFile: (f) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/${f}`,
-        });
-        hands.setOptions({
-          maxNumHands: 1,
-          modelComplexity: 0,
-          minDetectionConfidence: 0.55,
-          minTrackingConfidence: 0.45,
-        });
+        console.log("[JARVIS] Hand tracking ready! Video:", video.videoWidth, "x", video.videoHeight);
 
-        hands.onResults((results) => {
+        /* 5. Frame detection loop */
+        let lastTimestamp = -1;
+        function detect() {
           if (cancelled) return;
-          if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
-            const lm = results.multiHandLandmarks[0];
-            const wrist = lm[0];
-            const thumb = lm[4];
-            const index = lm[8];
-            const middle = lm[12];
-            /* pinch = avg distance thumb-to-index and thumb-to-middle */
-            const d1 = Math.hypot(thumb.x - index.x, thumb.y - index.y);
-            const d2 = Math.hypot(thumb.x - middle.x, thumb.y - middle.y);
-            const pinchDist = (d1 + d2) / 2;
-            handRef.current = { active: true, x: wrist.x, pinch: pinchDist };
-          } else {
-            handRef.current = { ...handRef.current, active: false };
+          const now = performance.now();
+          if (video.readyState >= 2 && now !== lastTimestamp) {
+            lastTimestamp = now;
+            try {
+              const results = landmarker.detectForVideo(video, now);
+              if (results.landmarks && results.landmarks.length > 0) {
+                const lm = results.landmarks[0];
+                /* landmark indices: 0=wrist, 4=thumb_tip, 8=index_tip, 12=middle_tip */
+                const wrist = lm[0];
+                const thumbTip = lm[4];
+                const indexTip = lm[8];
+                const middleTip = lm[12];
+
+                /* rotation: hand X position (0=left, 1=right) */
+                const handX = wrist.x;
+
+                /* pinch: average distance thumb-index and thumb-middle */
+                const d1 = Math.hypot(thumbTip.x - indexTip.x, thumbTip.y - indexTip.y);
+                const d2 = Math.hypot(thumbTip.x - middleTip.x, thumbTip.y - middleTip.y);
+                const pinch = (d1 + d2) / 2;
+
+                handRef.current = { active: true, x: handX, pinch: pinch };
+              } else {
+                handRef.current = { ...handRef.current, active: false };
+              }
+            } catch (e) {
+              /* skip frame on error */
+            }
           }
-        });
-
-        /* 5. Await full WASM initialization before sending frames */
-        await hands.initialize();
-        handsRef.current = hands;
-
-        if (cancelled) return;
-
-        /* 6. Manual frame loop (more reliable than Camera utility) */
-        let processing = false;
-        async function loop() {
-          if (cancelled) return;
-          if (!processing && video.readyState >= 2) {
-            processing = true;
-            try { await hands.send({ image: video }); } catch (e) { /* skip frame */ }
-            processing = false;
-          }
-          rafRef.current = requestAnimationFrame(loop);
+          rafRef.current = requestAnimationFrame(detect);
         }
-        loop();
+        detect();
+
       } catch (err) {
-        console.warn("Hand tracking init failed:", err);
+        console.error("[JARVIS] Hand tracking init failed:", err);
         handRef.current = { active: false, x: 0.5, pinch: 1 };
+        /* Show error to user */
+        const errDiv = document.createElement("div");
+        errDiv.style.cssText = "position:fixed;bottom:80px;left:12px;z-index:9999;color:#ff4444;font-size:11px;font-family:monospace;background:rgba(0,0,0,0.8);padding:8px 14px;border-radius:8px;max-width:300px;";
+        errDiv.textContent = "Camera error: " + (err.message || err) + ". Try HTTPS or allow camera.";
+        document.body.appendChild(errDiv);
+        setTimeout(() => errDiv.remove(), 8000);
       }
     }
 
     init();
+
     return () => {
       cancelled = true;
       if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
       if (streamRef.current) { streamRef.current.getTracks().forEach(t => t.stop()); streamRef.current = null; }
       if (videoRef.current) { videoRef.current.srcObject = null; videoRef.current.remove(); videoRef.current = null; }
-      if (handsRef.current) { try { handsRef.current.close(); } catch(e){} handsRef.current = null; }
+      if (landmarkerRef.current) { try { landmarkerRef.current.close(); } catch(e){} landmarkerRef.current = null; }
     };
   }, [enabled, handRef]);
 }
