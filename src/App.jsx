@@ -74,20 +74,19 @@ const BG           = "#000510";
 const RAIN_COUNT   = 3000;
 const DUST_COUNT   = 800;
 
-/* ============= HAND TRACKING HOOK ============= */
 function useHandTracking(handRef, enabled) {
-  const camRef   = useRef(null);
-  const handsRef = useRef(null);
-  const vidRef   = useRef(null);
+  const landmarkerRef = useRef(null);
+  const vidRef        = useRef(null);
+  const streamRef     = useRef(null);
+  const rafRef        = useRef(null);
 
   useEffect(() => {
     if (!enabled) {
-      if (camRef.current) { try { camRef.current.stop(); } catch(e){} camRef.current = null; }
-      if (vidRef.current) {
-        try { vidRef.current.srcObject?.getTracks().forEach((t) => t.stop()); } catch(e){}
-        vidRef.current.remove();
-        vidRef.current = null;
-      }
+      // tear-down
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (landmarkerRef.current) { try { landmarkerRef.current.close(); } catch(e){} landmarkerRef.current = null; }
+      if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+      if (vidRef.current) { vidRef.current.remove(); vidRef.current = null; }
       if (handRef.current) handRef.current.active = false;
       return;
     }
@@ -96,73 +95,98 @@ function useHandTracking(handRef, enabled) {
 
     (async () => {
       try {
-        const { Hands }  = await import("@mediapipe/hands");
-        const { Camera } = await import("@mediapipe/camera_utils");
+        const vision = await import('@mediapipe/tasks-vision');
+        const { FilesetResolver, HandLandmarker } = vision;
 
         if (cancelled) return;
 
-        const video = document.createElement("video");
-        video.setAttribute("playsinline", "true");
+        const wasmFileset = await FilesetResolver.forVisionTasks(
+          'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm'
+        );
+
+        if (cancelled) return;
+
+        const landmarker = await HandLandmarker.createFromOptions(wasmFileset, {
+          baseOptions: {
+            modelAssetPath: 'https://storage.googleapis.com/mediapipe-models/hand_landmarker/hand_landmarker/float16/latest/hand_landmarker.task',
+            delegate: 'GPU',
+          },
+          runningMode: 'VIDEO',
+          numHands: 1,
+          minHandDetectionConfidence: 0.6,
+          minTrackingConfidence: 0.5,
+        });
+        landmarkerRef.current = landmarker;
+
+        if (cancelled) return;
+
+        // create video element + webcam preview
+        const video = document.createElement('video');
+        video.setAttribute('playsinline', 'true');
+        video.autoplay = true;
         video.muted = true;
         video.style.cssText =
-          "position:fixed;bottom:80px;left:16px;width:160px;height:120px;" +
-          "border-radius:12px;border:2px solid #00aaff44;z-index:999;" +
-          "object-fit:cover;opacity:0.85;pointer-events:none;";
+          'position:fixed;bottom:80px;left:16px;width:160px;height:120px;' +
+          'border-radius:12px;border:2px solid #00aaff44;z-index:999;' +
+          'object-fit:cover;opacity:0.85;pointer-events:none;';
         document.body.appendChild(video);
         vidRef.current = video;
 
-        const hands = new Hands({
-          locateFile: (f) =>
-            `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}`,
+        const stream = await navigator.mediaDevices.getUserMedia({
+          video: { width: 320, height: 240, facingMode: 'user' },
         });
-        hands.setOptions({
-          maxNumHands: 1,
-          modelComplexity: 1,
-          minDetectionConfidence: 0.65,
-          minTrackingConfidence: 0.5,
-        });
-        hands.onResults((r) => {
-          if (!r.multiHandLandmarks || !r.multiHandLandmarks.length) {
-            if (handRef.current) handRef.current.active = false;
-            return;
-          }
-          const lm = r.multiHandLandmarks[0];
-          const wrist    = lm[0];
-          const thumb    = lm[4];
-          const indexTip = lm[8];
-          const pinch    = Math.hypot(
-            thumb.x - indexTip.x, thumb.y - indexTip.y, thumb.z - indexTip.z,
-          );
-          handRef.current = { active: true, x: wrist.x, y: wrist.y, pinch: pinch };
-        });
-        handsRef.current = hands;
+        streamRef.current = stream;
+        video.srcObject = stream;
+
+        await new Promise((resolve) => { video.onloadeddata = resolve; });
 
         if (cancelled) return;
-        const cam = new Camera(video, {
-          onFrame: async () => { await hands.send({ image: video }); },
-          width: 320,
-          height: 240,
-        });
-        cam.start();
-        camRef.current = cam;
+
+        // detection loop
+        var lastTime = -1;
+        function detect() {
+          if (cancelled) return;
+          rafRef.current = requestAnimationFrame(detect);
+          if (!video || video.readyState < 2) return;
+          var now = performance.now();
+          if (now - lastTime < 50) return; // ~20fps detection cap
+          lastTime = now;
+          try {
+            var result = landmarker.detectForVideo(video, now);
+            if (!result.landmarks || !result.landmarks.length) {
+              if (handRef.current) handRef.current.active = false;
+              return;
+            }
+            var lm    = result.landmarks[0];
+            var wrist  = lm[0];
+            var thumb   = lm[4];
+            var indexTip = lm[8];
+            var pinch   = Math.hypot(
+              thumb.x - indexTip.x, thumb.y - indexTip.y, (thumb.z || 0) - (indexTip.z || 0)
+            );
+            handRef.current = { active: true, x: wrist.x, y: wrist.y, pinch: pinch };
+          } catch (err) {
+            // skip frame
+          }
+        }
+        detect();
+
       } catch (err) {
-        console.warn("Hand tracking init failed:", err);
+        console.warn('Hand tracking init failed:', err);
+        if (handRef.current) handRef.current.active = false;
       }
     })();
 
     return () => {
       cancelled = true;
-      if (camRef.current) { try { camRef.current.stop(); } catch(e){} camRef.current = null; }
-      if (vidRef.current) {
-        try { vidRef.current.srcObject?.getTracks().forEach((t) => t.stop()); } catch(e){}
-        vidRef.current.remove();
-        vidRef.current = null;
-      }
+      if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
+      if (landmarkerRef.current) { try { landmarkerRef.current.close(); } catch(e){} landmarkerRef.current = null; }
+      if (streamRef.current) { streamRef.current.getTracks().forEach((t) => t.stop()); streamRef.current = null; }
+      if (vidRef.current) { vidRef.current.remove(); vidRef.current = null; }
       if (handRef.current) handRef.current.active = false;
     };
   }, [enabled, handRef]);
 }
-
 /* ============= DNA HELIX ============= */
 function DNAHelix({ onNodeClick, rotRef, handRef }) {
   const grp = useRef();
